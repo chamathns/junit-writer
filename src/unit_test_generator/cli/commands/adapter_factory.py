@@ -6,7 +6,6 @@ from unit_test_generator.infrastructure.adapters.file_system_adapter import File
 from unit_test_generator.infrastructure.adapters.embedding.sentence_transformer_adapter import SentenceTransformerAdapter
 from unit_test_generator.infrastructure.adapters.vector_db.chroma_adapter import ChromaDBAdapter
 from unit_test_generator.infrastructure.adapters.llm.google_gemini_adapter import GoogleGeminiAdapter
-from unit_test_generator.infrastructure.adapters.llm.mock_llm_adapter import MockLLMAdapter
 from unit_test_generator.infrastructure.adapters.parsing.simulated_parser_adapter import SimulatedParserAdapter
 from unit_test_generator.infrastructure.adapters.build_system.gradle_adapter import GradleAdapter
 from unit_test_generator.infrastructure.adapters.error_parsing.llm_error_parser_adapter import LLMErrorParserAdapter
@@ -93,8 +92,6 @@ def create_llm_service(config: Dict[str, Any]) -> LLMServicePort:
     logger.info(f"Creating LLMService for provider: {provider}")
     if provider == 'google_gemini':
         return GoogleGeminiAdapter(config)
-    elif provider == 'mock':
-        return MockLLMAdapter(config)
     # Add other providers like 'openai', 'anthropic' here
     else:
         raise ValueError(f"Unsupported LLM provider: {provider}")

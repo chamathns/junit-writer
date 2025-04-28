@@ -6,7 +6,7 @@ from typing import Dict, Any, List
 from pathlib import Path
 
 # Import factories
-from unit_test_generator.cli.adapter_factory import (
+from unit_test_generator.cli.commands.adapter_factory import (
     create_file_system_adapter, create_embedding_service, create_vector_db,
     create_llm_service, create_code_parser, create_dependency_resolver,
     create_build_system, create_error_parser, create_source_control, # Added source control

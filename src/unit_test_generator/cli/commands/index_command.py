@@ -4,7 +4,7 @@ import argparse
 from typing import Dict, Any
 
 # Import necessary factories and use cases
-from unit_test_generator.cli.adapter_factory import (
+from unit_test_generator.cli.commands.adapter_factory import (
     create_file_system_adapter,
     create_embedding_service,
     create_vector_db,
