@@ -90,7 +90,7 @@ generation:
   model_name: "gemini-2.0-flash"
   # API Key: Set the GOOGLE_API_KEY environment variable
   # Or uncomment and set here (less secure):
-  api_key: "AIzaSyBuTVf0k374iOiE1M_43blrhgkOxFaEgF8"
+  api_key: "{GOOGLE_API_KEY}"
 
   # Output directory for generated tests (relative to project root)
   output_dir: "generated-tests"
@@ -101,8 +101,8 @@ generation:
   # RAG Context settings for generation
   context_similarity_threshold: 0.75 # Minimum similarity score for RAG examples (0.0 to 1.0)
   context_max_rag_examples: 5      # Max RAG examples to include
-  context_max_dependency_files: 40  # Max dependency files to include
-  context_max_tokens: 500000        # Target token limit for the entire context payload
+  context_max_dependency_files: 20  # Max dependency files to include
+  context_max_tokens: 100000        # Target token limit for the entire context payload
 
   # Intelligent context building
   use_intelligent_context: true    # Use the intelligent context builder with dependency graph
