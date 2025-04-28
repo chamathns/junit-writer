@@ -11,8 +11,8 @@ ui:
   type: "rich"
   # Enable enhanced logging with colors and formatting
   enhanced_logging: true
-  # Progress bar style (only for rich UI)
-  progress_style: "bar"
+  # Progress bar style (only for rich UI): 'bar', 'spinner', or 'text'
+  progress_style: "text"
   # Color theme: 'default', 'dark', 'light'
   theme: "default"
 

@@ -405,13 +405,13 @@ def create_ui_service(config: Dict[str, Any]):
 
     if ui_type == 'rich':
         logger.info("Using Rich UI adapter")
-        return RichUIAdapter()
+        return RichUIAdapter(config)
     elif ui_type == 'tqdm':
         logger.info("Using TQDM UI adapter")
         return TqdmUIAdapter()
     else:
         logger.info(f"Unknown UI type '{ui_type}', defaulting to Rich UI adapter")
-        return RichUIAdapter()
+        return RichUIAdapter(config)
 
 
 def create_agent_coordinator(agent_factory: 'AgentFactory', state_manager: 'StateManager', config: Dict[str, Any]) -> 'AgentCoordinator':

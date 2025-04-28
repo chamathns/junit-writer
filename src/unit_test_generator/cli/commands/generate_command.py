@@ -170,6 +170,10 @@ def handle_generate(args: argparse.Namespace, config: Dict[str, Any]):
 
                 progress = ui.progress(estimated_files, f"Processing {estimated_files} files in parallel...")
 
+                # We'll use the status display for now since we don't have a good way to track progress
+                # without modifying the use case implementation
+
+            # Execute the use case
             result = generate_tests_for_commit_use_case.execute(
                 commit_hash_or_file_path=target_norm,
                 file_extensions=file_extensions,
@@ -224,7 +228,14 @@ def handle_generate(args: argparse.Namespace, config: Dict[str, Any]):
             # Target is a file path, use the single-file use case
             ui.log(f"Target '{target_norm}' identified as a file path", LogLevel.INFO)
             status.update(f"Generating tests for file: {target_norm}...")
-            result = generate_use_case.execute(target_file_rel_path=target_norm)
+
+            # We'll use the status display for now since we don't have a good way to track progress
+            # in the single file case without modifying the use case implementation
+            try:
+                result = generate_use_case.execute(target_file_rel_path=target_norm)
+            except Exception as e:
+                ui.log(f"Error generating tests: {e}", LogLevel.ERROR)
+                raise
 
             # Stop the status display
             status.stop()

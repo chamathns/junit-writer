@@ -11,20 +11,20 @@ from unit_test_generator.infrastructure.adapters.ui.tqdm_ui_adapter import TqdmU
 def create_ui_service(config: Dict[str, Any]) -> UIServicePort:
     """
     Create a UI service based on configuration.
-    
+
     Args:
         config: The application configuration
-        
+
     Returns:
         An implementation of UIServicePort
     """
     ui_config = config.get("ui", {})
     ui_type = ui_config.get("type", "rich").lower()
-    
+
     if ui_type == "rich":
-        return RichUIAdapter()
+        return RichUIAdapter(config)
     elif ui_type == "tqdm":
         return TqdmUIAdapter()
     else:
         # Default to Rich
-        return RichUIAdapter()
+        return RichUIAdapter(config)
