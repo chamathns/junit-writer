@@ -1,13 +1,13 @@
 # JUnit Writer
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 JUnit Writer is an AI-powered tool that automatically generates high-quality JUnit tests for Kotlin and Java code. It uses advanced LLM techniques, including RAG (Retrieval-Augmented Generation) and multi-agent workflows, to create comprehensive test suites that follow best practices.
 
 ## 🚀 Features
 
 - **Intelligent Test Generation**: Creates JUnit 5 tests with MockK for Kotlin and Java code
-- **Multiple Operation Modes**: Choose between Standard, Agent, and Commit modes
+- **Multiple Operation Modes**: Choose between Standard, Agent (powered by Google's Agent Development Kit), and Commit modes
 - **Self-Healing Capabilities**: Automatically fixes compilation errors and test failures
 - **RAG-Enhanced Context**: Uses similar code examples to improve test quality
 - **Dependency Analysis**: Includes relevant dependencies in the generation context
@@ -112,6 +112,10 @@ JUnit Writer follows clean architecture principles, with clear separation betwee
 - Application layer (use cases and orchestration)
 - Infrastructure layer (external interfaces and adapters)
 
+The architecture includes interactive diagrams to help visualize the system:
+
+![Architecture Diagram](docs/diagrams/architecture_mermaid.md#high-level-architecture)
+
 For more details about the architecture, see [Architecture Documentation](docs/architecture.md).
 
 ## 👥 Contributing
@@ -122,4 +126,4 @@ For guidelines on contributing to this project, see [Contributing Guide](docs/co
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.

@@ -14,40 +14,11 @@ This separation ensures that the core business logic is independent of external 
 
 ## Architecture Diagram
 
-```
-                        [ CLI (User Input) ]
-                              |
-                     +--------v--------+       (--mode selects path)
-                     |  Orchestrator   |
-                     |    Factory      |       (chooses Standard vs Agent orchestrator)
-                     +---+---------+---+
-                         |         |
-           --------------|---------|--------------
-           |             |         |             |
-   [ Standard Mode ]     |         |    [ Agent Mode ]
-   TestGenerationOrchestrator      |     AgentCoordinator (ADK)
-   (Sequential workflow)           |     (Multi-agent orchestration)
-                         |         |
-                         v         v
-                (calls common Domain services & uses models)
-                         |         |
-           --------------|---------|--------------
-                         |         
-                   [ Domain Layer ] 
-                 - TestSpec, JUnitTest models
-                 - ErrorAnalysis model
-                 - Domain logic for generation & healing
-                 - Ports (LLM, TestRunner, etc.)
-                         |
-           --------------|-------------------------------
-                         |          
-                  [ Infrastructure Layer ]
-                 - CLI Adapter (parses args, invokes orchestrator)
-                 - LLM API Client (implements LLM port)
-                 - Test Runner (implements runner port)
-                 - Code Editor (implements fix port)
-                 - ADK library & agents (tools for agent mode)
-```
+JUnit Writer follows a clean architecture approach with clear separation of concerns. The high-level architecture is shown below:
+
+![High-Level Architecture](diagrams/architecture_mermaid.md#high-level-architecture)
+
+For interactive diagrams, see the [Mermaid Architecture Diagrams](diagrams/architecture_mermaid.md).
 
 ## Key Components
 
@@ -126,42 +97,17 @@ The infrastructure layer contains implementations of interfaces defined in the d
 
 ### Standard Mode Workflow
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Initial Setup  │────▶│    Resolve      │────▶│   RAG Search    │
-│ (Read, Embed,   │     │  Dependencies   │     │                 │
-│    Parse)       │     │                 │     │                 │
-└─────────────────┘     └─────────────────┘     └────────┬────────┘
-                                                         │
-┌─────────────────┐     ┌─────────────────┐     ┌────────▼────────┐
-│   Self-Healing  │◀────│   Write Test    │◀────│  Generate Test  │
-│  (if enabled)   │     │      File       │     │      Code       │
-│                 │     │                 │     │                 │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-```
+The standard mode follows a sequential, deterministic workflow:
+
+![Standard Mode Workflow](diagrams/architecture_mermaid.md#standard-mode-workflow)
 
 ### Agent Mode Workflow
 
-```
-┌─────────────────┐
-│ AgentCoordinator│
-│    (Start)      │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐     ┌─────────────────┐
-│  AnalyzeAgent   │────▶│  GenerateAgent  │
-│ (Analyze code   │     │ (Generate test  │
-│  structure)     │     │     code)       │
-└─────────────────┘     └────────┬────────┘
-                                 │
-                                 ▼
-┌─────────────────┐     ┌─────────────────┐
-│    FixAgent     │◀────│   RunTestAgent  │
-│ (Fix test       │     │ (Run and        │
-│  failures)      │     │  evaluate test) │
-└─────────────────┘     └─────────────────┘
-```
+The agent mode uses Google's Agent Development Kit (ADK) to implement a multi-agent workflow:
+
+![Agent Mode Workflow](diagrams/architecture_mermaid.md#agent-mode-workflow)
+
+In this workflow, multiple specialized agents work together to analyze the code, generate tests, run them, and fix any issues. The ADK provides the framework for agent communication and coordination.
 
 ## Design Patterns
 

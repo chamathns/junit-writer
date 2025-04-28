@@ -7,7 +7,7 @@ JUnit Writer supports multiple operation modes that determine how test generatio
 JUnit Writer supports three primary modes:
 
 1. **Standard Mode**: A sequential, deterministic workflow with fixed control flow
-2. **Agent Mode**: An AI-driven, flexible workflow using a multi-agent approach
+2. **Agent Mode**: An AI-driven, flexible workflow using Google's Agent Development Kit (ADK)
 3. **Commit Mode**: A specialized mode for processing files changed in a specific commit
 
 ## Selecting a Mode
@@ -49,6 +49,8 @@ Standard Mode implements a fixed, sequential algorithm for test generation and s
 7. Write test file
 8. Run self-healing if enabled
 
+![Standard Mode Workflow](diagrams/architecture_mermaid.md#standard-mode-workflow)
+
 ### Characteristics
 
 - **Deterministic**: Follows the same path every time
@@ -67,7 +69,7 @@ Standard Mode implements a fixed, sequential algorithm for test generation and s
 
 ### Overview
 
-Agent Mode uses a multi-agent workflow to generate and fix tests. It delegates specialized tasks to autonomous agents under a coordinating strategy, allowing for more flexible and potentially more powerful test generation.
+Agent Mode uses a multi-agent workflow powered by Google's Agent Development Kit (ADK) to generate and fix tests. It delegates specialized tasks to autonomous agents under a coordinating strategy, allowing for more flexible and potentially more powerful test generation. The ADK provides a framework for creating, coordinating, and executing multiple AI agents that can work together to solve complex problems.
 
 ### Key Components
 
@@ -85,6 +87,8 @@ Agent Mode uses a multi-agent workflow to generate and fix tests. It delegates s
 4. The RunTestAgent runs the tests and evaluates the results
 5. If tests fail, the FixAgent attempts to fix the issues
 6. Steps 4-5 repeat until tests pass or max attempts are reached
+
+![Agent Mode Workflow](diagrams/architecture_mermaid.md#agent-mode-workflow)
 
 ### Characteristics
 
