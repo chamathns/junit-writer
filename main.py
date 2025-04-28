@@ -11,10 +11,10 @@ if str(src_path) not in sys.path:
 
 # --- CLI Specific Imports ---
 # Setup helpers
-from unit_test_generator.cli.commands.config_loader import load_and_resolve_config, ensure_app_directories
-from unit_test_generator.cli.commands.logging_setup import setup_logging
+from unit_test_generator.cli.config_loader import load_and_resolve_config, ensure_app_directories
+from unit_test_generator.cli.logging_setup import setup_logging
 # Argument Parser
-from unit_test_generator.cli.commands.argument_parser import parse_arguments # Import the function
+from unit_test_generator.cli.argument_parser import parse_arguments # Import the function
 # Command handlers
 from unit_test_generator.cli.commands.index_command import handle_index
 from unit_test_generator.cli.commands.generate_command import handle_generate
