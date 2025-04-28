@@ -67,26 +67,71 @@ class AgentGenerateTests:
         """
         logger.info(f"Generating tests for {target_file_rel_path} using agent mode")
 
-        # For now, we'll just delegate to the standard use case
-        # In a real implementation, this would use the agent coordinator to orchestrate the process
-        from unit_test_generator.application.use_cases.generate_tests import GenerateTestsUseCase
+        try:
+            # Create a goal for test generation
+            goal = Goal(
+                name="generate_test",
+                description=f"Generate unit tests for {target_file_rel_path}",
+                success_criteria=["test_code_generated", "test_file_written"]
+            )
 
-        # Create a standard use case
-        standard_use_case = GenerateTestsUseCase(
-            file_system=self.file_system,
-            embedding_service=self.embedding_service,
-            vector_db=self.vector_db,
-            llm_service=self.llm_service,
-            code_parser=self.code_parser,
-            build_system=None,  # We don't need this for delegation
-            error_parser=None,  # We don't need this for delegation
-            dependency_resolver=None,  # We don't need this for delegation
-            adk_runner=None,  # We don't need this for delegation
-            config=self.config
-        )
+            # Read the source file content
+            target_file_abs_path = self.repo_root / target_file_rel_path
+            if not self.file_system.exists(str(target_file_abs_path)):
+                return {
+                    "status": "error",
+                    "message": f"Target source file not found: {target_file_abs_path}"
+                }
 
-        # Execute the standard use case
-        result = standard_use_case.execute(target_file_rel_path)
+            file_content = self.file_system.read_file(str(target_file_abs_path))
+            if not file_content or file_content.isspace():
+                return {
+                    "status": "error",
+                    "message": "Target file is empty or whitespace-only"
+                }
 
-        logger.info(f"Agent-based generate tests use case completed for {target_file_rel_path}")
-        return result
+            # Check for existing test file
+            from unit_test_generator.application.services.test_output_path_resolver import TestOutputPathResolver
+            path_resolver = TestOutputPathResolver(self.config, self.repo_root)
+            path_resolver.set_file_system(self.file_system)
+            existing_test_file = path_resolver.find_existing_test_file(target_file_rel_path)
+            update_mode = existing_test_file is not None
+
+            # Prepare initial state
+            initial_state = {
+                "target_file_rel_path": target_file_rel_path,
+                "target_file_abs_path": str(target_file_abs_path),
+                "repo_root": str(self.repo_root),
+                "file_content": file_content,
+                "update_mode": update_mode,
+                "existing_test_file": existing_test_file,
+                "language": self.config.get('generation', {}).get('target_language', 'Kotlin'),
+                "framework": self.config.get('generation', {}).get('target_framework', 'JUnit5 with MockK')
+            }
+
+            logger.info(f"Starting execution of goal: {goal.name}")
+            logger.info(f"Initial state: {initial_state}")
+
+            # Execute the goal using the agent coordinator
+            result_state = self.agent_coordinator.execute_goal(goal, initial_state)
+
+            logger.info(f"Goal execution completed with success={result_state.success}")
+
+            # Extract results from the final state
+            if result_state.success:
+                return {
+                    "status": "success",
+                    "output_path": result_state.data.get("test_file_path"),
+                    "message": "Test generation completed successfully"
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": result_state.data.get("error_message", "Unknown error during agent-based test generation")
+                }
+        except Exception as e:
+            logger.error(f"Error in agent-based test generation: {e}", exc_info=True)
+            return {
+                "status": "error",
+                "message": f"Error in agent-based test generation: {str(e)}"
+            }

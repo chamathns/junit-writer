@@ -142,6 +142,8 @@ class ModeSelector:
         from unit_test_generator.application.use_cases.agent_generate_tests import AgentGenerateTests
         from unit_test_generator.application.use_cases.self_healing import SelfHealingUseCase
 
+
+
         if use_case_type == "index_repository":
             # Use standard implementation for now
             return IndexRepositoryUseCase(

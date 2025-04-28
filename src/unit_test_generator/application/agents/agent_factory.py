@@ -18,7 +18,7 @@ class AgentFactory:
     """
     Factory for creating agents.
     """
-    
+
     def __init__(
         self,
         config: Dict[str, Any],
@@ -30,7 +30,7 @@ class AgentFactory:
     ):
         """
         Initialize the agent factory.
-        
+
         Args:
             config: Configuration dictionary
             llm_service: LLM service port
@@ -46,41 +46,50 @@ class AgentFactory:
         self.vector_db = vector_db
         self.code_parser = code_parser
         self.agent_classes = {}  # Will be populated by register_agent
-        
+
         # Register built-in agents
         self._register_built_in_agents()
-    
+
     def register_agent(self, agent_type: str, agent_class: Type[Agent]) -> None:
         """
         Register an agent class for a specific type.
-        
+
         Args:
             agent_type: The type of agent
             agent_class: The agent class
         """
         self.agent_classes[agent_type] = agent_class
-    
+
     def create_agent(self, agent_type: str) -> Agent:
         """
         Create an agent of the specified type.
-        
+
         Args:
             agent_type: The type of agent to create
-            
+
         Returns:
             An instance of the specified agent type
-            
+
         Raises:
             ValueError: If the agent type is unknown
         """
+        logger.info(f"Creating agent of type: {agent_type}")
+
         if agent_type not in self.agent_classes:
+            logger.error(f"Unknown agent type: {agent_type}")
             raise ValueError(f"Unknown agent type: {agent_type}")
-        
+
         agent_class = self.agent_classes[agent_type]
+        logger.info(f"Using agent class: {agent_class.__name__}")
+
         tools = self._get_tools_for_agent(agent_type)
-        
-        return agent_class(agent_type, tools, self.config)
-    
+        logger.info(f"Created tools for agent: {list(tools.keys())}")
+
+        agent = agent_class(agent_type, tools, self.config)
+        logger.info(f"Agent {agent_type} created successfully")
+
+        return agent
+
     def _register_built_in_agents(self) -> None:
         """Register built-in agents."""
         # Import here to avoid circular imports
@@ -88,22 +97,24 @@ class AgentFactory:
         from unit_test_generator.application.agents.generate_agent import GenerateAgent
         from unit_test_generator.application.agents.fix_agent import FixAgent
         from unit_test_generator.application.agents.index_agent import IndexAgent
-        
+
         self.register_agent("analyze", AnalyzeAgent)
         self.register_agent("generate", GenerateAgent)
         self.register_agent("fix", FixAgent)
         self.register_agent("index", IndexAgent)
-    
+
     def _get_tools_for_agent(self, agent_type: str) -> Dict[str, Any]:
         """
         Get the tools for a specific agent type.
-        
+
         Args:
             agent_type: The type of agent
-            
+
         Returns:
             Dictionary of tools for the agent
         """
+        logger.info(f"Getting tools for agent type: {agent_type}")
+
         # Create basic tools available to all agents
         tools = {
             "file_system": self.file_system,
@@ -112,19 +123,30 @@ class AgentFactory:
             "vector_db": self.vector_db,
             "code_parser": self.code_parser
         }
-        
+
+        # Verify tools are not None
+        for tool_name, tool in tools.items():
+            if tool is None:
+                logger.warning(f"Tool {tool_name} is None for agent {agent_type}")
+            else:
+                logger.info(f"Tool {tool_name} is available for agent {agent_type}: {type(tool).__name__}")
+
         # Add agent-specific tools
         if agent_type == "analyze":
             # Add analyze-specific tools
+            logger.info("Adding analyze-specific tools")
             pass
         elif agent_type == "generate":
             # Add generate-specific tools
+            logger.info("Adding generate-specific tools")
             pass
         elif agent_type == "fix":
             # Add fix-specific tools
+            logger.info("Adding fix-specific tools")
             pass
         elif agent_type == "index":
             # Add index-specific tools
+            logger.info("Adding index-specific tools")
             pass
-        
+
         return tools

@@ -69,58 +69,82 @@ class GenerateTestsForCommitUseCase:
 
     def execute(
         self,
-        commit_hash: str,
+        commit_hash_or_file_path: str,
         file_extensions: Optional[List[str]] = None,
         parallel: bool = False,
         max_workers: int = 4
     ) -> Dict[str, Any]:
         """
-        Executes the test generation process for files changed in a commit.
+        Executes the test generation process for files changed in a commit or a single file.
 
         Args:
-            commit_hash: The commit hash to check.
-            file_extensions: Optional list of file extensions to filter by.
-            parallel: Whether to process files in parallel.
-            max_workers: Maximum number of parallel workers.
+            commit_hash_or_file_path: Either a commit hash to check or a file path to generate tests for.
+            file_extensions: Optional list of file extensions to filter by (only used for commit mode).
+            parallel: Whether to process files in parallel (only used for commit mode).
+            max_workers: Maximum number of parallel workers (only used for commit mode).
 
         Returns:
             A dictionary with results for each file.
         """
-        logger.info(f"GenerateTestsForCommitUseCase executing for commit: {commit_hash}")
+        # Check if the input is a commit hash or a file path
+        is_file_path = '/' in commit_hash_or_file_path or '\\' in commit_hash_or_file_path
 
-        try:
-            # 1. Get the list of changed files
-            changed_files = self.source_control.get_changed_files(commit_hash, file_extensions)
+        if is_file_path:
+            logger.info(f"GenerateTestsForCommitUseCase executing for file: {commit_hash_or_file_path}")
+            return self._process_single_file(commit_hash_or_file_path)
+        else:
+            # Treat as commit hash
+            commit_hash = commit_hash_or_file_path
+            logger.info(f"GenerateTestsForCommitUseCase executing for commit: {commit_hash}")
 
-            if not changed_files:
-                logger.warning(f"No matching files found in commit {commit_hash}")
-                return {
-                    "status": "warning",
-                    "message": f"No matching files found in commit {commit_hash}",
-                    "results": {}
-                }
+            try:
+                # 1. Get the list of changed files
+                changed_files = self.source_control.get_changed_files(commit_hash, file_extensions)
 
-            logger.info(f"Found {len(changed_files)} files to process in commit {commit_hash}")
-
-            # 2. Generate tests for each file
-            results = {}
-
-            # Process files with diff analysis
-            if parallel and len(changed_files) > 1:
-                # Process files in parallel
-                logger.info(f"Processing {len(changed_files)} files in parallel with {max_workers} workers")
-                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    # Create a dictionary mapping futures to file paths
-                    future_to_file = {
-                        executor.submit(self._process_file_with_diff, commit_hash, file_path): file_path
-                        for file_path in changed_files
+                if not changed_files:
+                    logger.warning(f"No matching files found in commit {commit_hash}")
+                    return {
+                        "status": "warning",
+                        "message": f"No matching files found in commit {commit_hash}",
+                        "results": {}
                     }
 
-                    # Process results as they complete
-                    for future in concurrent.futures.as_completed(future_to_file):
-                        file_path = future_to_file[future]
+                logger.info(f"Found {len(changed_files)} files to process in commit {commit_hash}")
+
+                # 2. Generate tests for each file
+                results = {}
+
+                # Process files with diff analysis
+                if parallel and len(changed_files) > 1:
+                    # Process files in parallel
+                    logger.info(f"Processing {len(changed_files)} files in parallel with {max_workers} workers")
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        # Create a dictionary mapping futures to file paths
+                        future_to_file = {
+                            executor.submit(self._process_file_with_diff, commit_hash, file_path): file_path
+                            for file_path in changed_files
+                        }
+
+                        # Process results as they complete
+                        for future in concurrent.futures.as_completed(future_to_file):
+                            file_path = future_to_file[future]
+                            try:
+                                result = future.result()
+                                results[file_path] = result
+                                logger.info(f"Completed test generation for {file_path} with status: {result.get('status')}")
+                            except Exception as e:
+                                logger.error(f"Error generating tests for {file_path}: {e}", exc_info=True)
+                                results[file_path] = {
+                                    "status": "error",
+                                    "message": f"Error: {str(e)}"
+                                }
+                else:
+                    # Process files sequentially
+                    logger.info(f"Processing {len(changed_files)} files sequentially")
+                    for file_path in changed_files:
                         try:
-                            result = future.result()
+                            logger.info(f"Generating tests for {file_path}")
+                            result = self._process_file_with_diff(commit_hash, file_path)
                             results[file_path] = result
                             logger.info(f"Completed test generation for {file_path} with status: {result.get('status')}")
                         except Exception as e:
@@ -129,39 +153,24 @@ class GenerateTestsForCommitUseCase:
                                 "status": "error",
                                 "message": f"Error: {str(e)}"
                             }
-            else:
-                # Process files sequentially
-                logger.info(f"Processing {len(changed_files)} files sequentially")
-                for file_path in changed_files:
-                    try:
-                        logger.info(f"Generating tests for {file_path}")
-                        result = self._process_file_with_diff(commit_hash, file_path)
-                        results[file_path] = result
-                        logger.info(f"Completed test generation for {file_path} with status: {result.get('status')}")
-                    except Exception as e:
-                        logger.error(f"Error generating tests for {file_path}: {e}", exc_info=True)
-                        results[file_path] = {
-                            "status": "error",
-                            "message": f"Error: {str(e)}"
-                        }
 
-            # 3. Summarize results
-            success_count = sum(1 for result in results.values() if result.get('status', '').startswith('success'))
-            error_count = len(results) - success_count
+                # 3. Summarize results
+                success_count = sum(1 for result in results.values() if result.get('status', '').startswith('success'))
+                error_count = len(results) - success_count
 
-            return {
-                "status": "success" if error_count == 0 else "partial_success" if success_count > 0 else "error",
-                "message": f"Generated tests for {success_count}/{len(results)} files",
-                "results": results
-            }
+                return {
+                    "status": "success" if error_count == 0 else "partial_success" if success_count > 0 else "error",
+                    "message": f"Generated tests for {success_count}/{len(results)} files",
+                    "results": results
+                }
 
-        except Exception as e:
-            logger.critical(f"Unexpected error in GenerateTestsForCommitUseCase for {commit_hash}: {e}", exc_info=True)
-            return {
-                "status": "error",
-                "message": f"Unexpected UseCase error: {e}",
-                "results": {}
-            }
+            except Exception as e:
+                logger.critical(f"Unexpected error in GenerateTestsForCommitUseCase for {commit_hash}: {e}", exc_info=True)
+                return {
+                    "status": "error",
+                    "message": f"Unexpected UseCase error: {e}",
+                    "results": {}
+                }
 
     def _process_file_with_diff(self, commit_hash: str, file_path: str) -> Dict[str, Any]:
         """
@@ -337,6 +346,69 @@ class GenerateTestsForCommitUseCase:
             return {
                 'status': 'error',
                 'message': f"Error: {str(e)}"
+            }
+
+    def _process_single_file(self, file_path: str) -> Dict[str, Any]:
+        """
+        Processes a single file without diff analysis.
+
+        Args:
+            file_path: The path of the file to process.
+
+        Returns:
+            The result of the test generation process.
+        """
+        try:
+            logger.info(f"Processing single file: {file_path}")
+
+            # Generate the test file
+            result = self.generate_tests_use_case.execute(file_path)
+
+            # Get the test file path
+            test_file_path = result.get("test_file_path")
+            if not test_file_path:
+                logger.warning(f"No test file path returned for {file_path}")
+                return {
+                    "status": "error",
+                    "message": f"No test file path returned for {file_path}"
+                }
+
+            # Commit the changes
+            try:
+                # Add the test file to the staging area
+                self.source_control.add_file(test_file_path)
+
+                # Create a commit message
+                commit_message = f"Add tests for {file_path}"
+
+                # Commit the changes
+                self.source_control.commit(commit_message)
+
+                logger.info(f"Successfully committed changes for {test_file_path}")
+
+                return {
+                    "status": "success",
+                    "message": f"Generated and committed test file at {test_file_path}",
+                    "test_file_path": test_file_path,
+                    "commit_success": True
+                }
+            except Exception as e:
+                logger.error(f"Error committing changes: {e}", exc_info=True)
+
+                return {
+                    "status": "partial_success",
+                    "message": f"Generated test file at {test_file_path} but failed to commit: {str(e)}",
+                    "test_file_path": test_file_path,
+                    "commit_success": False,
+                    "commit_error": str(e)
+                }
+
+        except Exception as e:
+            logger.error(f"Error processing file {file_path}: {e}", exc_info=True)
+
+            return {
+                "status": "error",
+                "message": f"Error: {str(e)}"
             }
 
     def _generate_test_with_diff(self, file_path: str, diff_info: Dict[str, Any], diff_analysis: Dict[str, Any], test_file_path: str) -> Dict[str, Any]:
