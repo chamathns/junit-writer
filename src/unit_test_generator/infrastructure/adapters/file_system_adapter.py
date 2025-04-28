@@ -7,7 +7,6 @@ from typing import List, Generator
 # Assuming ports are accessible (adjust import path as needed)
 from unit_test_generator.domain.ports.file_system import FileSystemPort
 
-
 class FileSystemAdapter(FileSystemPort):
     """Concrete implementation of FileSystemPort using standard Python libraries."""
 
@@ -19,7 +18,7 @@ class FileSystemAdapter(FileSystemPort):
         """
         root = Path(root_path).resolve()
         for item in root.rglob('*'):
-            relative_path_str = str(item.relative_to(root)).replace(os.sep, '/')  # Normalize slashes for matching
+            relative_path_str = str(item.relative_to(root)).replace(os.sep, '/') # Normalize slashes for matching
             # Add a '/' suffix for directories to match directory patterns like 'build/'
             match_path = relative_path_str + ('/' if item.is_dir() else '')
 
@@ -27,24 +26,23 @@ class FileSystemAdapter(FileSystemPort):
             is_ignored = False
             for pattern in ignore_patterns:
                 if fnmatch.fnmatch(match_path, pattern) or \
-                        any(fnmatch.fnmatch(part + '/', pattern) for part in item.relative_to(root).parts if
-                            pattern.endswith('/')):
-                    # Check if any parent directory matches a directory pattern
-                    parent_ignored = False
-                    temp_path = item.parent
-                    while temp_path != root:
-                        rel_parent_str = str(temp_path.relative_to(root)).replace(os.sep, '/') + '/'
-                        if any(fnmatch.fnmatch(rel_parent_str, p) for p in ignore_patterns if p.endswith('/')):
-                            parent_ignored = True
-                            break
-                        temp_path = temp_path.parent
-                    if parent_ignored:
-                        is_ignored = True
-                        break
+                   any(fnmatch.fnmatch(part + '/', pattern) for part in item.relative_to(root).parts if pattern.endswith('/')):
+                     # Check if any parent directory matches a directory pattern
+                     parent_ignored = False
+                     temp_path = item.parent
+                     while temp_path != root:
+                         rel_parent_str = str(temp_path.relative_to(root)).replace(os.sep, '/') + '/'
+                         if any(fnmatch.fnmatch(rel_parent_str, p) for p in ignore_patterns if p.endswith('/')):
+                             parent_ignored = True
+                             break
+                         temp_path = temp_path.parent
+                     if parent_ignored:
+                          is_ignored = True
+                          break
 
-                    # If the direct path matches or a parent dir matches
-                    is_ignored = True
-                    break  # No need to check other patterns
+                     # If the direct path matches or a parent dir matches
+                     is_ignored = True
+                     break # No need to check other patterns
 
             if is_ignored:
                 # If a directory is ignored, skip its contents implicitly via rglob's behavior
@@ -60,8 +58,8 @@ class FileSystemAdapter(FileSystemPort):
                 return f.read()
         except Exception as e:
             # Consider logging the error here
-            print(f"Error reading file {file_path}: {e}")  # Replace with proper logging
-            raise  # Re-raise or handle appropriately
+            print(f"Error reading file {file_path}: {e}") # Replace with proper logging
+            raise # Re-raise or handle appropriately
 
     def write_file(self, file_path: str, content: str):
         try:
@@ -70,7 +68,7 @@ class FileSystemAdapter(FileSystemPort):
             with open(path, 'w', encoding='utf-8') as f:
                 f.write(content)
         except Exception as e:
-            print(f"Error writing file {file_path}: {e}")  # Replace with proper logging
+            print(f"Error writing file {file_path}: {e}") # Replace with proper logging
             raise
 
     def exists(self, path: str) -> bool:
@@ -83,8 +81,9 @@ class FileSystemAdapter(FileSystemPort):
         return str(full.relative_to(base))
 
     def make_dirs(self, path: str):
-        # Use exist_ok=True to avoid errors if directory already exists
+         # Use exist_ok=True to avoid errors if directory already exists
         Path(path).parent.mkdir(parents=True, exist_ok=True)
+
 
     def get_file_extension(self, file_path: str) -> str:
         return Path(file_path).suffix
@@ -102,7 +101,7 @@ class FileSystemAdapter(FileSystemPort):
                 # Use custom encoder if needed for complex objects (like Enums)
                 json.dump(data, f, indent=2, default=str)
         except Exception as e:
-            print(f"Error writing JSON file {file_path}: {e}")  # Replace with proper logging
+            print(f"Error writing JSON file {file_path}: {e}") # Replace with proper logging
             raise
 
     def read_json(self, file_path: str) -> dict:
@@ -111,9 +110,28 @@ class FileSystemAdapter(FileSystemPort):
             with open(file_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except FileNotFoundError:
-            print(f"JSON file not found: {file_path}")  # Replace with proper logging
-            return {}  # Return empty dict if not found
+             print(f"JSON file not found: {file_path}") # Replace with proper logging
+             return {} # Return empty dict if not found
         except Exception as e:
-            print(f"Error reading JSON file {file_path}: {e}")  # Replace with proper logging
+            print(f"Error reading JSON file {file_path}: {e}") # Replace with proper logging
             raise
-        
+
+    def list_files(self, directory_path: str) -> List[str]:
+        """Lists all files in a directory."""
+        try:
+            directory = Path(directory_path)
+            if not directory.exists() or not directory.is_dir():
+                return []
+            return [str(file) for file in directory.iterdir() if file.is_file()]
+        except Exception as e:
+            print(f"Error listing files in {directory_path}: {e}") # Replace with proper logging
+            return []
+
+    def file_exists(self, file_path: str) -> bool:
+        """Checks if a file exists."""
+        try:
+            path = Path(file_path)
+            return path.exists() and path.is_file()
+        except Exception as e:
+            print(f"Error checking if file exists {file_path}: {e}") # Replace with proper logging
+            return False

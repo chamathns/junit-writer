@@ -1,12 +1,11 @@
 import logging
 from typing import List, Dict, Any, Optional
 import chromadb
-from chromadb.utils import embedding_functions  # Import for configuring collection
+from chromadb.utils import embedding_functions # Import for configuring collection
 
 from unit_test_generator.domain.ports.vector_db import VectorDBPort
 
 logger = logging.getLogger(__name__)
-
 
 class ChromaDBAdapter(VectorDBPort):
     """Vector DB implementation using ChromaDB."""
@@ -14,8 +13,8 @@ class ChromaDBAdapter(VectorDBPort):
     def __init__(self, config: Dict[str, Any]):
         self.db_path = config['vector_db']['path']
         self.collection_name = config['vector_db']['collection_name']
-        self.embedding_model_name = config['embedding']['model_name']  # Needed to configure collection
-        self.distance_metric = config['vector_db'].get('distance_metric', 'cosine')  # Default to cosine
+        self.embedding_model_name = config['embedding']['model_name'] # Needed to configure collection
+        self.distance_metric = config['vector_db'].get('distance_metric', 'cosine') # Default to cosine
 
         try:
             logger.info(f"Initializing ChromaDB client with path: {self.db_path}")
@@ -30,8 +29,8 @@ class ChromaDBAdapter(VectorDBPort):
             logger.info(f"Getting or creating ChromaDB collection: {self.collection_name}")
             self.collection = self.client.get_or_create_collection(
                 name=self.collection_name,
-                embedding_function=chroma_embedding_fn,  # Associate the function type with the collection
-                metadata={"hnsw:space": self.distance_metric}  # Configure distance metric
+                embedding_function=chroma_embedding_fn, # Associate the function type with the collection
+                metadata={"hnsw:space": self.distance_metric} # Configure distance metric
             )
             logger.info(f"ChromaDB collection '{self.collection_name}' ready. Count: {self.collection.count()}")
 
@@ -54,7 +53,7 @@ class ChromaDBAdapter(VectorDBPort):
                 if isinstance(v, (str, int, float, bool)):
                     sanitized[k] = v
                 elif v is None:
-                    continue  # Skip None values or replace with placeholder if needed
+                    continue # Skip None values or replace with placeholder if needed
                 else:
                     # Convert other types (like lists) to strings or handle appropriately
                     sanitized[k] = str(v)
@@ -74,16 +73,15 @@ class ChromaDBAdapter(VectorDBPort):
             logger.error(f"Error upserting documents into ChromaDB: {e}", exc_info=True)
             # Depending on the error, you might want partial success handling or re-raising
 
-    def find_similar(self, embedding: List[float], n_results: int, filter_metadata: Optional[Dict[str, Any]] = None) -> \
-    List[Dict[str, Any]]:
+    def find_similar(self, embedding: List[float], n_results: int, filter_metadata: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """Finds similar documents based on embedding."""
         try:
             logger.debug(f"Querying collection '{self.collection_name}' for {n_results} similar results.")
             results = self.collection.query(
-                query_embeddings=[embedding],  # Query expects a list of embeddings
+                query_embeddings=[embedding], # Query expects a list of embeddings
                 n_results=n_results,
-                where=filter_metadata,  # Optional filter dictionary
-                include=['metadatas', 'distances', 'documents']  # Include desired fields
+                where=filter_metadata, # Optional filter dictionary
+                include=['metadatas', 'distances', 'documents'] # Include desired fields
             )
             logger.debug(f"Query returned {len(results.get('ids', [[]])[0])} results.")
 
@@ -110,4 +108,4 @@ class ChromaDBAdapter(VectorDBPort):
             return self.collection.count()
         except Exception as e:
             logger.error(f"Error getting count from ChromaDB collection '{self.collection_name}': {e}", exc_info=True)
-            return -1  # Indicate error
+            return -1 # Indicate error

@@ -1,3 +1,4 @@
+# src/unit_test_generator/infrastructure/adapters/embedding/sentence_transformer_adapter.py
 import logging
 from typing import List, Dict, Any
 from sentence_transformers import SentenceTransformer
@@ -6,7 +7,6 @@ import numpy as np
 from unit_test_generator.domain.ports.embedding_service import EmbeddingServicePort
 
 logger = logging.getLogger(__name__)
-
 
 class SentenceTransformerAdapter(EmbeddingServicePort):
     """Embedding service implementation using Sentence Transformers."""
@@ -26,27 +26,29 @@ class SentenceTransformerAdapter(EmbeddingServicePort):
         """Generates an embedding vector for the given text."""
         try:
             # encode() returns a numpy array, convert to list
-            embedding = self.model.encode(text, convert_to_numpy=False)
+            # Convert to numpy to ensure we get a standard format
+            embedding = self.model.encode(text, convert_to_numpy=True)
+
             # Ensure it's a flat list of floats
             if isinstance(embedding, np.ndarray):
-                embedding = embedding.tolist()
-            if isinstance(embedding, list) and all(isinstance(x, float) for x in embedding):
-                return embedding
+                return embedding.tolist()
+            elif hasattr(embedding, 'tolist'):
+                return embedding.tolist()
+            elif isinstance(embedding, list):
+                return list(embedding)
             else:
                 logger.error(f"Unexpected embedding format for text: {type(embedding)}")
-                # Handle error case appropriately, maybe return empty list or raise specific error
                 return []
         except Exception as e:
             logger.error(f"Error generating embedding for text: {e}", exc_info=True)
-            return []  # Return empty list on error
+            return [] # Return empty list on error
 
     def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """Generates embedding vectors for a batch of texts."""
         try:
             logger.debug(f"Generating embeddings for {len(texts)} texts...")
             # Convert to numpy to ensure we get a standard format
-            embeddings = self.model.encode(texts, convert_to_numpy=True,
-                                           show_progress_bar=False)  # Progress bar can be noisy
+            embeddings = self.model.encode(texts, convert_to_numpy=True, show_progress_bar=False) # Progress bar can be noisy
 
             # Ensure it's a list of lists of floats
             if isinstance(embeddings, np.ndarray):
@@ -64,4 +66,4 @@ class SentenceTransformerAdapter(EmbeddingServicePort):
             return result
         except Exception as e:
             logger.error(f"Error generating batch embeddings: {e}", exc_info=True)
-            return [[] for _ in texts]  # Return list of empty lists on error
+            return [[] for _ in texts] # Return list of empty lists on error
