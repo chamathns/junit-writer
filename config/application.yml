@@ -1,80 +1,142 @@
+
 # --- General Settings ---
- logging:
-   level: INFO
-   format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-   log_file: "var/logs/app.log"
+logging:
+  level: INFO
+  format: '%(asctime)s - %(name)s - %(levelname)s [%(module)s:%(lineno)d] - %(message)s'
+  log_file: "var/logs/app.log"
 
- # --- Repository Indexing Settings ---
- repository:
-   # Path to the root of the repository to be scanned.
-   # Can be overridden by CLI argument.
-   root_path: "/Users/chamath/demo/repositories/abc-service" # Example path, adjust as needed
+# --- Repository Indexing Settings ---
+repository:
+  # Path to the root of the repository to be scanned.
+  # Can be overridden by CLI argument.
+  root_path: "/Users/chamath/demo/repositories/abc-service" # Example path, adjust as needed
 
- indexing:
-   source_roots: [ "src/main/kotlin" ]
-   test_roots: [ "src/test/kotlin" ]
-   code_extensions: [ ".kt" ]
-   ignore_patterns:
-     - ".git/"
-     - ".github/"
-     - ".gradle/"
-     - ".kotlin/"
-     - "build/"
-     - "deployments/"
-     - "gradle/wrapper/"
-     - "var/" # Assuming our tool's output/temp data goes here
-     - "**/resources/"
-     - "**/proto/"
-     - "**/migration/scripts/"
-     - "*.sh"
-     - "*.bat"
-     - "*.md"
-     - "*.yml"
-     - "*.yaml"
-     - "*.json"
-     - "*.sql"
-     - "*.xml"
-     - "*.csv"
-     - "*.jar"
-     - "*.properties"
-     - ".editorconfig"
-     - ".gitattributes"
-     - ".gitignore"
-     - ".gitleaksignore"
-     - ".trivyignore"
-     - ".prd-deploy-protect"
-     - "Dockerfile"
-     - "settings.gradle.kts"
-     - "build.gradle.kts"
-     - "gradle.properties"
-     - "detekt.yml"
+indexing:
+  source_roots: [ "src/main/kotlin" ]
+  test_roots: [ "src/test/kotlin" ]
+  code_extensions: [ ".kt" ]
+  ignore_patterns:
+    - ".git/"
+    - ".github/"
+    - ".gradle/"
+    - ".kotlin/"
+    - "build/"
+    - "deployments/"
+    - "gradle/wrapper/"
+    - "var/" # Assuming our tool's output/temp data goes here
+    - "**/resources/"
+    - "**/proto/"
+    - "**/migration/scripts/"
+    - "*.sh"
+    - "*.bat"
+    - "*.md"
+    - "*.yml"
+    - "*.yaml"
+    - "*.json"
+    - "*.sql"
+    - "*.xml"
+    - "*.csv"
+    - "*.jar"
+    - "*.properties"
+    - ".editorconfig"
+    - ".gitattributes"
+    - ".gitignore"
+    - ".gitleaksignore"
+    - ".trivyignore"
+    - ".prd-deploy-protect"
+    - "Dockerfile"
+    - "settings.gradle.kts"
+    - "build.gradle.kts"
+    - "gradle.properties"
+    - "detekt.yml"
 
-   # Path where the generated index file will be stored (relative to project root)
-   index_file_path: "var/index/repository_index.json"
-   # Naming conventions for linking source to tests
-   # {ClassName} -> {ClassName}Test
-   test_suffixes: ["Test"]
-   test_prefixes: []
+  # Path where the generated index file will be stored (relative to project root)
+  index_file_path: "var/index/repository_index.json"
+  # Naming conventions for linking source to tests
+  # {ClassName} -> {ClassName}Test
+  test_suffixes: ["Test"]
+  test_prefixes: []
 
- # --- Embedding Settings (Placeholder for now) ---
- embedding:
-   provider: "sentence_transformer" # or "openai"
-   model_name: "all-MiniLM-L6-v2"
-   # api_key: ${OPENAI_API_KEY} # Example for OpenAI
+# --- Embedding Settings (Placeholder for now) ---
+embedding:
+  provider: "sentence_transformer" # or "openai"
+  model_name: "all-MiniLM-L6-v2"
+  # api_key: ${OPENAI_API_KEY} # Example for OpenAI
 
- # --- Vector DB Settings (Placeholder for now) ---
- vector_db:
-   provider: "chroma" # or "pinecone"
-   path: "var/rag_db/chroma" # For ChromaDB
-   collection_name: "code_artifacts"
-   # api_key: ${PINECONE_API_KEY} # Example for Pinecone
-   # environment: "us-west1-gcp" # Example for Pinecone
-   distance_metric: "cosine"
+# --- Vector DB Settings (Placeholder for now) ---
+vector_db:
+  provider: "chroma" # or "pinecone"
+  path: "var/rag_db/chroma" # For ChromaDB
+  collection_name: "code_artifacts"
+  # api_key: ${PINECONE_API_KEY} # Example for Pinecone
+  # environment: "us-west1-gcp" # Example for Pinecone
+  distance_metric: "cosine"
 
- # --- Test Generation Settings (Placeholder for now) ---
- generation:
-   output_dir: "generated-tests"
-   llm_provider: "mock" # or "openai", "anthropic"
-   # model_name: "gpt-4-turbo-preview"
-   # api_key: ${OPENAI_API_KEY}
-   context_max_similar_files: 2
+# --- Test Generation Settings (Placeholder for now) ---
+generation:
+  # LLM Provider configuration
+  llm_provider: "google_gemini" # Options: "google_gemini", "mock" # Add openai, anthropic later
+  model_name: "gemini-2.0-flash"
+  # API Key: Set the GOOGLE_API_KEY environment variable
+  # Or uncomment and set here (less secure):
+  api_key: "AIzaSyBuTVf0k374iOiE1M_43blrhgkOxFaEgF8"
+
+  # Output directory for generated tests (relative to project root)
+  output_dir: "generated-tests"
+
+  # Whether to write tests directly to the repository structure (required for self-healing)
+  write_to_repo: true
+
+  # RAG Context settings for generation
+  context_similarity_threshold: 0.75 # Minimum similarity score for RAG examples (0.0 to 1.0)
+  context_max_rag_examples: 5      # Max RAG examples to include
+  context_max_dependency_files: 40  # Max dependency files to include
+  context_max_tokens: 500000        # Target token limit for the entire context payload
+
+  # Intelligent context building
+  use_intelligent_context: true    # Use the intelligent context builder with dependency graph
+  use_layer_aware_generation: true # Use layer-aware test generation
+
+  # Prompting settings
+  target_language: "Kotlin"
+  target_framework: "JUnit5 with MockK"
+
+# --- Error Parsing Settings ---
+error_parsing:
+  adapter: "hybrid" # Options: "hybrid", "enhanced_llm", "regex", "llm", "junit_gradle"
+
+# --- Build System Settings ---
+build_system:
+  type: "gradle"  # Options: "gradle", "maven"
+  command: "./gradlew"  # Command to run Gradle (can be system gradle or wrapper)
+  fallback_commands: ["gradle", "./gradlew.bat"]  # Fallback commands if primary fails
+  pre_args: "--stacktrace --info"  # Arguments to add before the task
+  timeout: 120  # Timeout in seconds for build operations
+  verify_before_run: true  # Whether to verify environment before running tests
+  compile_before_run: true  # Whether to compile tests before running them
+  # Terminal settings for running tests in separate windows
+  terminal:
+    enabled: true  # Whether to enable running tests in separate terminals
+    title_prefix: "JUnit Writer Test"  # Prefix for terminal window titles
+  # Module mapping strategy (for multi-module projects)
+  module_mapping:
+    strategy: "path_based"  # Options: "path_based", "explicit"
+    # For explicit mapping, define module paths
+    modules: {}
+
+# --- Orchestrator Settings ---
+orchestrator:
+  defaultMode: standard   # "standard" or "agent"; used if CLI --mode not specified
+
+# --- Commit Mode Settings ---
+commit_mode:
+  use_diff_focused_approach: true  # Use the diff-focused approach for test generation/updating
+  skip_similar_test_search: true   # Skip similar test search when no new imports are added
+  skip_dependency_search: true     # Skip dependent files search when no new imports are added
+
+# --- Self-Healing Settings ---
+self_healing:
+  enabled: false
+  max_attempts: 1
+  max_parallel_agents: 3  # Maximum number of parallel error analysis agents
+  use_intelligent_fix: true  # Use the new intelligent error analysis system

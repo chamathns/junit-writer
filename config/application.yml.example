@@ -1,0 +1,117 @@
+# --- General Settings ---
+logging:
+  level: INFO
+  format: '%(asctime)s - %(name)s - %(levelname)s [%(module)s:%(lineno)d] - %(message)s'
+  log_file: "var/logs/app.log"
+
+# --- Repository Indexing Settings ---
+repository:
+  # Path to the root of the repository to be scanned.
+  # Replace with your actual repository path
+  root_path: "/path/to/your/kotlin/project"
+
+indexing:
+  source_roots: [ "src/main/kotlin" ]
+  test_roots: [ "src/test/kotlin" ]
+  code_extensions: [ ".kt" ]
+  ignore_patterns:
+    - ".git/"
+    - ".github/"
+    - ".gradle/"
+    - "build/"
+    - "*.md"
+    - "*.yml"
+    - "*.yaml"
+    - "*.json"
+    - "*.properties"
+    - "*.gradle.kts"
+
+  # Path where the generated index file will be stored (relative to project root)
+  index_file_path: "var/index/repository_index.json"
+
+  # Naming conventions for linking source to tests
+  test_suffixes: ["Test"]
+  test_prefixes: []
+
+# --- Embedding Settings ---
+embedding:
+  provider: "sentence_transformer"  # or "openai"
+  model_name: "all-MiniLM-L6-v2"
+  # api_key: ${OPENAI_API_KEY}      # For OpenAI (use environment variable)
+
+# --- Vector DB Settings ---
+vector_db:
+  provider: "chroma"                # or "pinecone"
+  path: "var/rag_db/chroma"         # For ChromaDB
+  collection_name: "code_artifacts"
+  distance_metric: "cosine"
+
+# --- Test Generation Settings ---
+generation:
+  # LLM Provider configuration
+  llm_provider: "google_gemini"     # Options: "google_gemini", "mock"
+  model_name: "gemini-2.0-flash"
+
+  # API Key: Set the GOOGLE_API_KEY environment variable
+  # Or uncomment and set here (less secure):
+  # api_key: "YOUR_API_KEY_HERE"
+
+  # Output directory for generated tests (relative to project root)
+  output_dir: "generated-tests"
+
+  # RAG Context settings for generation
+  context_similarity_threshold: 0.75  # Minimum similarity score (0.0 to 1.0)
+  context_max_rag_examples: 6         # Max RAG examples to include
+  context_max_dependency_files: 15    # Max dependency files to include
+  context_max_tokens: 300000          # Target token limit for context
+
+  # Intelligent context building
+  use_intelligent_context: true    # Use the intelligent context builder with dependency graph
+  use_layer_aware_generation: true # Use layer-aware test generation
+
+  # Prompting settings
+  target_language: "Kotlin"
+  target_framework: "JUnit5 with MockK"
+
+# --- Error Parsing Settings ---
+error_parsing:
+  adapter: "regex"  # Options: "llm", "regex"
+
+# --- Orchestrator Settings ---
+orchestrator:
+  defaultMode: standard   # "standard" or "agent"; used if CLI --mode not specified
+
+# --- Agent Configuration ---
+agents:
+  enabled: true
+  coordinator:
+    max_goal_attempts: 3
+
+  # Individual agent configuration
+  index:
+    model: "gemini-2.0-flash"
+    max_iterations: 3
+
+  generate:
+    model: "gemini-2.0-pro"
+    max_iterations: 5
+    success_criteria:
+      - "compiles_successfully"
+      - "covers_public_methods"
+
+  fix:
+    model: "gemini-2.0-pro"
+    max_iterations: 3
+    success_criteria:
+      - "compiles_successfully"
+
+  analyze:
+    model: "gemini-2.0-flash"
+    max_iterations: 2
+
+# --- Self-Healing Settings ---
+self_healing:
+  enabled: true     # Whether to attempt to fix compilation errors
+  max_attempts: 3   # Maximum number of fix attempts
+  max_parallel_agents: 3  # Maximum number of parallel error analysis agents
+  use_intelligent_fix: true  # Use the new intelligent error analysis system
