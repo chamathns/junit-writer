@@ -148,9 +148,16 @@ agents:
       - "compiles_successfully"
       - "covers_public_methods"
 
+  fix:
+    model: "gemini-2.0-flash"
+    max_iterations: 3
+    success_criteria:
+      - "test_fixed"
+      - "fix_complete"
+
 # --- Self-Healing Settings ---
 self_healing:
-  enabled: false
-  max_attempts: 1
+  enabled: true
+  max_attempts: 3
   max_parallel_agents: 3  # Maximum number of parallel error analysis agents
   use_intelligent_fix: true  # Use the new intelligent error analysis system

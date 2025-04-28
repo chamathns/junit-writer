@@ -124,7 +124,7 @@ JSON Output:
 """
         return prompt
 
-    def _parse_llm_response(self, response_text: str) -> List[ParsedError]:
+    def _parse_llm_response(self, response_text: str, raw_output: Optional[str] = None) -> List[ParsedError]:
         """Parses the LLM response into a list of ParsedError objects."""
         if not response_text:
             logger.error("LLM returned empty response for error parsing.")
@@ -141,7 +141,8 @@ JSON Output:
             if cleaned_response.startswith("```kotlin") or \
                ("package " in cleaned_response and "import " in cleaned_response and "class " in cleaned_response):
                 logger.warning("LLM returned Kotlin code instead of JSON.")
-                return []
+                # Try to extract error information from the code
+                return self._extract_errors_from_code(cleaned_response, raw_output=raw_output)
 
             # Remove markdown code fences if present
             if cleaned_response.startswith("```json"):
@@ -229,7 +230,7 @@ JSON Output:
             response_text = self.llm_service.generate_tests(context)
 
             # Parse the LLM response
-            llm_errors = self._parse_llm_response(response_text)
+            llm_errors = self._parse_llm_response(response_text, raw_output=raw_output)
 
             # If LLM parsing found errors, return them
             if llm_errors:
@@ -268,3 +269,78 @@ JSON Output:
                 error_category="Other",
                 suggested_fix="Review the build output manually to identify the issue."
             )]
+
+    def _extract_errors_from_code(self, code_response: str, raw_output: Optional[str] = None) -> List[ParsedError]:
+        """
+        Extracts error information from Kotlin code returned by the LLM.
+        This is a fallback method when the LLM returns code instead of JSON.
+
+        Args:
+            code_response: The code response from the LLM
+            raw_output: The raw build output (optional)
+
+        Returns:
+            A list of ParsedError objects
+        """
+        errors = []
+
+        # Clean up code response
+        if code_response.startswith("```kotlin"):
+            code_response = code_response[len("```kotlin"):]
+        if code_response.endswith("```"):
+            code_response = code_response[:code_response.rfind("```")]
+
+        code_response = code_response.strip()
+
+        # Look for common error patterns in the code
+        lines = code_response.split("\n")
+
+        # Check if this is a placeholder test
+        is_placeholder = False
+        for line in lines:
+            if "placeholder" in line.lower() or "dummy test" in line.lower() or "assert(true)" in line:
+                is_placeholder = True
+                break
+
+        if is_placeholder:
+            # This is a placeholder test, which means the original test had serious issues
+            # Create a more specific error
+            errors.append(ParsedError(
+                message="Test file has compilation errors that need to be fixed. Do not replace with placeholder test.",
+                error_type="Compilation",
+                involved_symbols=[],
+                error_category="SyntaxError",
+                suggested_fix="Fix the specific compilation errors in the original test file instead of replacing it."
+            ))
+
+            # Try to extract more specific information from raw output if available
+            if raw_output:
+                # Look for common Kotlin error patterns
+                if "Unresolved reference" in raw_output:
+                    errors.append(ParsedError(
+                        message="Unresolved reference in test file",
+                        error_type="Compilation",
+                        involved_symbols=[],
+                        error_category="UnresolvedReference",
+                        suggested_fix="Add missing import or fix the reference"
+                    ))
+                elif "Type mismatch" in raw_output:
+                    errors.append(ParsedError(
+                        message="Type mismatch in test file",
+                        error_type="Compilation",
+                        involved_symbols=[],
+                        error_category="TypeMismatch",
+                        suggested_fix="Fix the type mismatch"
+                    ))
+
+        # If no specific errors were found, add a generic error
+        if not errors:
+            errors.append(ParsedError(
+                message="Unknown compilation error in test file",
+                error_type="Compilation",
+                involved_symbols=[],
+                error_category="Other",
+                suggested_fix="Fix compilation errors in the test file"
+            ))
+
+        return errors

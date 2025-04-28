@@ -97,11 +97,13 @@ class AgentFactory:
         from unit_test_generator.application.agents.generate_agent import GenerateAgent
         from unit_test_generator.application.agents.fix_agent import FixAgent
         from unit_test_generator.application.agents.index_agent import IndexAgent
+        from unit_test_generator.application.agents.reasoning_agent import ReasoningAgent
 
         self.register_agent("analyze", AnalyzeAgent)
         self.register_agent("generate", GenerateAgent)
         self.register_agent("fix", FixAgent)
         self.register_agent("index", IndexAgent)
+        self.register_agent("reasoning", ReasoningAgent)
 
     def _get_tools_for_agent(self, agent_type: str) -> Dict[str, Any]:
         """
@@ -139,14 +141,212 @@ class AgentFactory:
         elif agent_type == "generate":
             # Add generate-specific tools
             logger.info("Adding generate-specific tools")
-            pass
+
+            # Import necessary tools
+            from unit_test_generator.cli.adapter_factory import (
+                create_build_system, create_run_terminal_test_tool,
+                create_get_terminal_output_tool, create_list_terminal_processes_tool
+            )
+
+            # Create build system
+            build_system = create_build_system(self.config)
+
+            # Create terminal test tools
+            run_terminal_test_tool = create_run_terminal_test_tool(build_system)
+            get_terminal_output_tool = create_get_terminal_output_tool(build_system)
+            list_terminal_processes_tool = create_list_terminal_processes_tool(build_system)
+
+            # Add tools to the generate agent
+            tools["run_terminal_test"] = run_terminal_test_tool
+            tools["get_terminal_output"] = get_terminal_output_tool
+            tools["list_terminal_processes"] = list_terminal_processes_tool
+
+            logger.info(f"Added terminal test tools to generate agent")
         elif agent_type == "fix":
             # Add fix-specific tools
             logger.info("Adding fix-specific tools")
-            pass
+
+            # Import necessary tools
+            from unit_test_generator.cli.adapter_factory import (
+                create_build_system, create_error_parser, create_run_test_tool,
+                create_parse_errors_tool, create_generate_fix_tool, create_intelligent_fix_tool,
+                create_run_terminal_test_tool, create_get_terminal_output_tool, create_list_terminal_processes_tool
+            )
+
+            # Create build system and error parser
+            build_system = create_build_system(self.config)
+            error_parser = create_error_parser(self.config, self.llm_service)
+
+            # Create tools for the fix agent
+            run_test_tool = create_run_test_tool(build_system)
+            parse_errors_tool = create_parse_errors_tool(error_parser)
+
+            # Create dependency resolver for fix tools
+            from unit_test_generator.application.services.dependency_resolver import DependencyResolverService
+            dependency_resolver = DependencyResolverService(self.file_system, self.config)
+
+            # Create fix tools
+            generate_fix_tool = create_generate_fix_tool(self.llm_service, error_parser, dependency_resolver, self.config)
+
+            # Create healing orchestrator if needed
+            try:
+                # Create error analyzer and fix generator
+                from unit_test_generator.application.services.error_analysis_service import ErrorAnalysisService
+                from unit_test_generator.application.services.fix_generation_service import FixGenerationService
+                from unit_test_generator.application.services.dependency_resolution_service import DependencyResolutionService
+                from unit_test_generator.application.services.healing_orchestrator_service import HealingOrchestratorService
+
+                # Create dependency resolution service
+                dependency_resolution_service = DependencyResolutionService(
+                    file_system=self.file_system,
+                    config=self.config
+                )
+
+                # Create error analyzer
+                error_analyzer = ErrorAnalysisService(
+                    llm_service=self.llm_service,
+                    dependency_resolver=dependency_resolution_service,
+                    config=self.config
+                )
+
+                # Create fix generator
+                fix_generator = FixGenerationService(
+                    llm_service=self.llm_service,
+                    config=self.config
+                )
+
+                # Create healing orchestrator
+                healing_orchestrator = HealingOrchestratorService(
+                    error_parser=error_parser,
+                    error_analyzer=error_analyzer,
+                    dependency_resolver=dependency_resolution_service,
+                    fix_generator=fix_generator,
+                    file_system=self.file_system,
+                    build_system=build_system,
+                    config=self.config
+                )
+
+                # Create intelligent fix tool
+                intelligent_fix_tool = create_intelligent_fix_tool(healing_orchestrator, self.config)
+                tools["intelligent_fix"] = intelligent_fix_tool
+                logger.info("Added intelligent_fix tool to fix agent")
+            except (ImportError, AttributeError) as e:
+                logger.warning(f"Could not create intelligent fix tool: {e}")
+
+            # Create terminal test tools
+            run_terminal_test_tool = create_run_terminal_test_tool(build_system)
+            get_terminal_output_tool = create_get_terminal_output_tool(build_system)
+            list_terminal_processes_tool = create_list_terminal_processes_tool(build_system)
+
+            # Add tools to the fix agent
+            tools["run_test"] = run_test_tool
+            tools["parse_errors"] = parse_errors_tool
+            tools["generate_fix"] = generate_fix_tool
+            tools["run_terminal_test"] = run_terminal_test_tool
+            tools["get_terminal_output"] = get_terminal_output_tool
+            tools["list_terminal_processes"] = list_terminal_processes_tool
+
+            logger.info(f"Added {len(tools) - 5} fix-specific tools to fix agent")
         elif agent_type == "index":
             # Add index-specific tools
             logger.info("Adding index-specific tools")
             pass
+        elif agent_type == "reasoning":
+            # Add reasoning-specific tools
+            logger.info("Adding reasoning-specific tools")
+
+            # Import necessary tools
+            from unit_test_generator.cli.adapter_factory import (
+                create_build_system, create_error_parser, create_run_test_tool,
+                create_parse_errors_tool, create_generate_fix_tool, create_intelligent_fix_tool,
+                create_run_terminal_test_tool, create_get_terminal_output_tool, create_list_terminal_processes_tool
+            )
+
+            # Create build system and error parser
+            build_system = create_build_system(self.config)
+            error_parser = create_error_parser(self.config, self.llm_service)
+
+            # Create tools for the reasoning agent
+            run_test_tool = create_run_test_tool(build_system)
+            parse_errors_tool = create_parse_errors_tool(error_parser)
+
+            # Create dependency resolver for reasoning tools
+            from unit_test_generator.application.services.dependency_resolver import DependencyResolverService
+            dependency_resolver = DependencyResolverService(self.file_system, self.config)
+
+            # Create fix tools
+            generate_fix_tool = create_generate_fix_tool(self.llm_service, error_parser, dependency_resolver, self.config)
+
+            # Create terminal test tools
+            run_terminal_test_tool = create_run_terminal_test_tool(build_system)
+            get_terminal_output_tool = create_get_terminal_output_tool(build_system)
+            list_terminal_processes_tool = create_list_terminal_processes_tool(build_system)
+
+            # Create healing orchestrator if needed
+            try:
+                # Create error analyzer and fix generator
+                from unit_test_generator.application.services.error_analysis_service import ErrorAnalysisService
+                from unit_test_generator.application.services.fix_generation_service import FixGenerationService
+                from unit_test_generator.application.services.dependency_resolution_service import DependencyResolutionService
+                from unit_test_generator.application.services.healing_orchestrator_service import HealingOrchestratorService
+
+                # Create dependency resolution service
+                dependency_resolution_service = DependencyResolutionService(
+                    file_system=self.file_system,
+                    config=self.config
+                )
+
+                # Create error analyzer
+                error_analyzer = ErrorAnalysisService(
+                    llm_service=self.llm_service,
+                    dependency_resolver=dependency_resolution_service,
+                    config=self.config
+                )
+
+                # Create fix generator
+                fix_generator = FixGenerationService(
+                    llm_service=self.llm_service,
+                    config=self.config
+                )
+
+                # Create healing orchestrator
+                healing_orchestrator = HealingOrchestratorService(
+                    error_parser=error_parser,
+                    error_analyzer=error_analyzer,
+                    dependency_resolver=dependency_resolution_service,
+                    fix_generator=fix_generator,
+                    file_system=self.file_system,
+                    build_system=build_system,
+                    config=self.config
+                )
+
+                # Create intelligent fix tool
+                intelligent_fix_tool = create_intelligent_fix_tool(healing_orchestrator, self.config)
+                tools["intelligent_fix"] = intelligent_fix_tool
+                logger.info("Added intelligent_fix tool to reasoning agent")
+
+                # Create analyze errors tool
+                from unit_test_generator.infrastructure.adk_tools.analyze_errors_tool import AnalyzeErrorsTool
+                analyze_errors_tool = AnalyzeErrorsTool(self.llm_service, error_parser, self.config)
+                tools["analyze_errors"] = analyze_errors_tool
+                logger.info("Added analyze_errors tool to reasoning agent")
+
+                # Create identify dependencies tool
+                from unit_test_generator.infrastructure.adk_tools.identify_dependencies_tool import IdentifyDependenciesTool
+                identify_dependencies_tool = IdentifyDependenciesTool(self.llm_service, dependency_resolution_service, self.config)
+                tools["identify_dependencies"] = identify_dependencies_tool
+                logger.info("Added identify_dependencies tool to reasoning agent")
+            except (ImportError, AttributeError) as e:
+                logger.warning(f"Could not create advanced reasoning tools: {e}")
+
+            # Add tools to the reasoning agent
+            tools["run_test"] = run_test_tool
+            tools["parse_errors"] = parse_errors_tool
+            tools["generate_fix"] = generate_fix_tool
+            tools["run_terminal_test"] = run_terminal_test_tool
+            tools["get_terminal_output"] = get_terminal_output_tool
+            tools["list_terminal_processes"] = list_terminal_processes_tool
+
+            logger.info(f"Added {len(tools) - 5} reasoning-specific tools to reasoning agent")
 
         return tools

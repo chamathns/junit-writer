@@ -187,14 +187,28 @@ class AgentCoordinator:
         Returns:
             List of required agent types
         """
-        # This is a simple mapping of goals to required agents
-        # In a real implementation, this could be more sophisticated
-        goal_to_agents = {
-            "index_repository": ["index"],
-            "generate_test": ["analyze", "generate"],
-            "fix_test": ["fix"],
-            "analyze_code": ["analyze"]
-        }
+        # Check if we're in reasoning mode
+        from unit_test_generator.application.services.mode_selector import ModeSelector
+        mode_selector = ModeSelector(self.config)
+
+        # If we're in reasoning mode, use the reasoning agent for generate_test and fix_test goals
+        if mode_selector.is_reasoning_mode():
+            logger.info("Using reasoning mode for agent selection")
+            goal_to_agents = {
+                "index_repository": ["index"],
+                "generate_test": ["analyze", "generate", "reasoning"],  # Use reasoning agent instead of fix
+                "fix_test": ["reasoning"],  # Use reasoning agent for fix
+                "analyze_code": ["analyze"]
+            }
+        else:
+            # This is a simple mapping of goals to required agents
+            # In a real implementation, this could be more sophisticated
+            goal_to_agents = {
+                "index_repository": ["index"],
+                "generate_test": ["analyze", "generate", "fix"],  # Added fix agent to the generate_test goal
+                "fix_test": ["fix"],
+                "analyze_code": ["analyze"]
+            }
 
         return goal_to_agents.get(goal.name, [])
 
@@ -218,7 +232,7 @@ class AgentCoordinator:
             for criterion in goal.success_criteria:
                 logger.info(f"Checking criterion {criterion}: {state.data.get(criterion, False)}")
 
-        # For generate_test goal, we need to make sure both analyze and generate agents have run
+        # For generate_test goal, we need to make sure all required agents have run
         if goal.name == "generate_test" and achieved:
             # Check if we have test_code_generated and test_file_written in the state
             test_code_generated = state.data.get("test_code_generated", False)
@@ -228,6 +242,16 @@ class AgentCoordinator:
             # If we don't have these, we need to run the generate agent
             if not (test_code_generated and test_file_written):
                 logger.info("Generate agent needs to run to complete the goal")
+                return False
+
+            # Check if the test has been fixed or verified
+            test_fixed = state.data.get("test_fixed", False)
+            fix_complete = state.data.get("fix_complete", False)
+            logger.info(f"Test fixed: {test_fixed}, Fix complete: {fix_complete}")
+
+            # If the fix agent hasn't run yet, we need to run it
+            if not fix_complete:
+                logger.info("Fix agent needs to run to complete the goal")
                 return False
 
         return achieved

@@ -36,7 +36,7 @@ class ModeSelector:
         self.mode = cli_mode if cli_mode else config_mode
 
         # Validate mode
-        if self.mode not in ["standard", "agent"]:
+        if self.mode not in ["standard", "agent", "reasoning"]:
             logger.warning(f"Invalid mode '{self.mode}', defaulting to 'standard'")
             self.mode = "standard"
 
@@ -49,9 +49,20 @@ class ModeSelector:
         Returns:
             True if agent mode is enabled, False otherwise
         """
-        # Check if mode is set to agent and the agents configuration is enabled
+        # Check if mode is set to agent or reasoning and the agents configuration is enabled
         agents_enabled = self.config.get("agents", {}).get("enabled", True)
-        return self.mode == "agent" and agents_enabled
+        return (self.mode in ["agent", "reasoning"]) and agents_enabled
+
+    def is_reasoning_mode(self) -> bool:
+        """
+        Check if reasoning mode is enabled.
+
+        Returns:
+            True if reasoning mode is enabled, False otherwise
+        """
+        # Check if mode is set to reasoning and the agents configuration is enabled
+        agents_enabled = self.config.get("agents", {}).get("enabled", True)
+        return self.mode == "reasoning" and agents_enabled
 
     def get_use_case(self, use_case_type: str, **kwargs) -> Any:
         """

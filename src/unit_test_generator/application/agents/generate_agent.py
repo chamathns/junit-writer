@@ -331,7 +331,41 @@ class GenerateAgent(Agent):
                 file_system.write_file(str(output_test_abs_path), generated_code)
                 logger.info(f"Successfully wrote test file of length {len(generated_code)}")
 
-                # Update the state
+                # Run the test in a terminal
+                logger.info("Running test in a terminal")
+                try:
+                    run_terminal_test_tool = self.tools.get("run_terminal_test")
+                    if run_terminal_test_tool:
+                        logger.info(f"Running test in terminal: {output_test_abs_path}")
+                        terminal_result = run_terminal_test_tool._execute({
+                            "test_file_abs_path": str(output_test_abs_path),
+                            "title": f"Test for {target_file_rel_path}"
+                        })
+
+                        logger.info(f"Terminal test result: {terminal_result}")
+                        terminal_id = terminal_result.get("terminal_id")
+                        output_file = terminal_result.get("output_file")
+
+                        # Update the state
+                        logger.info("Updating state with success=True and terminal info")
+                        return state.update({
+                            "test_code": generated_code,
+                            "test_file_path": str(output_test_abs_path),
+                            "test_file_rel_path": str(output_test_abs_path.relative_to(Path(repo_root))),
+                            "generation_complete": True,
+                            "success": True,
+                            "test_code_generated": True,
+                            "test_file_written": True,
+                            "terminal_id": terminal_id,
+                            "output_file": output_file,
+                            "test_running": True
+                        })
+                    else:
+                        logger.warning("Run terminal test tool not available")
+                except Exception as e:
+                    logger.error(f"Error running test in terminal: {e}", exc_info=True)
+
+                # Update the state without terminal info if we couldn't run the test
                 logger.info("Updating state with success=True")
                 return state.update({
                     "test_code": generated_code,
@@ -374,4 +408,15 @@ class GenerateAgent(Agent):
             True if the goal has been achieved, False otherwise
         """
         # Generation is successful if the test code was generated and written to a file
-        return state.data.get("test_code_generated", False) and state.data.get("test_file_written", False)
+        test_generated = state.data.get("test_code_generated", False)
+        test_written = state.data.get("test_file_written", False)
+
+        # Check if we attempted to run the test in a terminal
+        test_running = state.data.get("test_running", False)
+        terminal_id = state.data.get("terminal_id")
+
+        # Log the success criteria
+        logger.info(f"Success criteria: test_generated={test_generated}, test_written={test_written}, test_running={test_running}, terminal_id={terminal_id}")
+
+        # Success requires test generation and writing, running in terminal is a bonus but not required
+        return test_generated and test_written

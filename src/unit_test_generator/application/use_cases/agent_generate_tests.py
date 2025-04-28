@@ -72,7 +72,7 @@ class AgentGenerateTests:
             goal = Goal(
                 name="generate_test",
                 description=f"Generate unit tests for {target_file_rel_path}",
-                success_criteria=["test_code_generated", "test_file_written"]
+                success_criteria=["test_code_generated", "test_file_written", "fix_complete"]
             )
 
             # Read the source file content

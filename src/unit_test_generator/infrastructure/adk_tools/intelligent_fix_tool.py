@@ -56,14 +56,18 @@ class IntelligentFixTool(JUnitWriterTool):
         error_output = parameters.get("error_output")
 
         # Check required parameters
-        if not all([target_file_path, target_file_content, test_file_path, current_test_code, error_output]):
+        if not all([target_file_path, target_file_content, test_file_path, current_test_code]):
             missing = []
             if not target_file_path: missing.append("target_file_path")
             if not target_file_content: missing.append("target_file_content")
             if not test_file_path: missing.append("test_file_path")
             if not current_test_code: missing.append("current_test_code")
-            if not error_output: missing.append("error_output")
             raise ValueError(f"Missing required parameters: {', '.join(missing)}")
+
+        # If error_output is missing, use a default message
+        if not error_output:
+            logger.warning("No error_output provided, using default message")
+            error_output = "Compilation error occurred but no detailed output was captured."
 
         # Extract optional parameters or use defaults from config
         language = parameters.get("language", self.config.get('generation', {}).get('target_language', 'Kotlin'))

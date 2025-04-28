@@ -41,6 +41,8 @@ from unit_test_generator.infrastructure.adk_tools import (
     ResolveDependenciesTool
 )
 from unit_test_generator.infrastructure.adk_tools.intelligent_fix_tool import IntelligentFixTool
+from unit_test_generator.infrastructure.adk_tools.analyze_errors_tool import AnalyzeErrorsTool
+from unit_test_generator.infrastructure.adk_tools.identify_dependencies_tool import IdentifyDependenciesTool
 
 # Import ADK components
 from google.adk.tools import BaseTool
@@ -58,6 +60,7 @@ from unit_test_generator.domain.ports.code_parser import CodeParserPort
 from unit_test_generator.domain.ports.build_system import BuildSystemPort
 from unit_test_generator.domain.ports.error_parser import ErrorParserPort
 from unit_test_generator.domain.ports.source_control import SourceControlPort
+from unit_test_generator.domain.ports.dependency_resolver import DependencyResolverPort
 from unit_test_generator.domain.ports.error_analysis import (
     ErrorAnalysisPort, DependencyResolutionPort, FixGenerationPort, HealingOrchestratorPort
 )
@@ -307,6 +310,32 @@ def create_read_file_tool(file_system: FileSystemPort) -> ReadFileTool:
 def create_resolve_dependencies_tool(dependency_resolver: DependencyResolverService) -> ResolveDependenciesTool:
     logger.debug("Creating ResolveDependenciesTool")
     return ResolveDependenciesTool(dependency_resolver=dependency_resolver)
+
+# Analyze Errors Tool
+def create_analyze_errors_tool(
+    llm_service: LLMServicePort,
+    error_parser: ErrorParserPort,
+    config: Dict[str, Any]
+) -> AnalyzeErrorsTool:
+    logger.debug("Creating AnalyzeErrorsTool")
+    return AnalyzeErrorsTool(
+        llm_service=llm_service,
+        error_parser=error_parser,
+        config=config
+    )
+
+# Identify Dependencies Tool
+def create_identify_dependencies_tool(
+    llm_service: LLMServicePort,
+    dependency_resolver: DependencyResolverPort,
+    config: Dict[str, Any]
+) -> IdentifyDependenciesTool:
+    logger.debug("Creating IdentifyDependenciesTool")
+    return IdentifyDependenciesTool(
+        llm_service=llm_service,
+        dependency_resolver=dependency_resolver,
+        config=config
+    )
 
 def create_source_control(config: Dict[str, Any]) -> SourceControlPort:
     """Creates a source control adapter."""
