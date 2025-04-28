@@ -5,6 +5,17 @@ logging:
   format: '%(asctime)s - %(name)s - %(levelname)s [%(module)s:%(lineno)d] - %(message)s'
   log_file: "var/logs/app.log"
 
+# --- UI Settings ---
+ui:
+  # UI type: 'rich' (default) or 'tqdm'
+  type: "rich"
+  # Enable enhanced logging with colors and formatting
+  enhanced_logging: true
+  # Progress bar style (only for rich UI)
+  progress_style: "bar"
+  # Color theme: 'default', 'dark', 'light'
+  theme: "default"
+
 # --- Repository Indexing Settings ---
 repository:
   # Path to the root of the repository to be scanned.

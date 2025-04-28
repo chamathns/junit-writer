@@ -14,6 +14,14 @@ from unit_test_generator.infrastructure.adapters.error_parsing.regex_error_parse
 from unit_test_generator.infrastructure.adapters.error_parsing.hybrid_error_parser_adapter import HybridErrorParserAdapter
 from unit_test_generator.infrastructure.adapters.source_control.git_adapter import GitAdapter
 
+# Import UI adapters
+try:
+    from unit_test_generator.infrastructure.adapters.ui.rich_ui_adapter import RichUIAdapter
+    from unit_test_generator.infrastructure.adapters.ui.tqdm_ui_adapter import TqdmUIAdapter
+    UI_ADAPTERS_AVAILABLE = True
+except ImportError:
+    UI_ADAPTERS_AVAILABLE = False
+
 # Import application services
 from unit_test_generator.application.services.dependency_resolver import DependencyResolverService
 from unit_test_generator.application.services.error_analysis_service import ErrorAnalysisService
@@ -380,6 +388,30 @@ def create_state_manager() -> 'StateManager':
     logger.info("Creating StateManager")
     from unit_test_generator.application.agents.state_manager import StateManager
     return StateManager()
+
+
+def create_ui_service(config: Dict[str, Any]):
+    """Create a UI service based on configuration."""
+    logger.info("Creating UI Service")
+
+    # Check if UI adapters are available
+    if not UI_ADAPTERS_AVAILABLE:
+        logger.warning("UI adapters not available. Install rich and tqdm for enhanced UI.")
+        return None
+
+    # Get UI configuration
+    ui_config = config.get('ui', {})
+    ui_type = ui_config.get('type', 'rich').lower()
+
+    if ui_type == 'rich':
+        logger.info("Using Rich UI adapter")
+        return RichUIAdapter()
+    elif ui_type == 'tqdm':
+        logger.info("Using TQDM UI adapter")
+        return TqdmUIAdapter()
+    else:
+        logger.info(f"Unknown UI type '{ui_type}', defaulting to Rich UI adapter")
+        return RichUIAdapter()
 
 
 def create_agent_coordinator(agent_factory: 'AgentFactory', state_manager: 'StateManager', config: Dict[str, Any]) -> 'AgentCoordinator':
