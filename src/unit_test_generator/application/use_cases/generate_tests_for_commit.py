@@ -242,6 +242,46 @@ class GenerateTestsForCommitUseCase:
             logger.error(f"Error processing file {file_path} with diff: {e}", exc_info=True)
             raise
 
+    def _clean_code_block_markers(self, code: str) -> str:
+        """
+        Cleans markdown code block markers from the generated code.
+
+        Args:
+            code: The code to clean.
+
+        Returns:
+            The cleaned code.
+        """
+        if not code:
+            return code
+
+        # Check if the code starts with ```kotlin or ``` and ends with ```
+        if code.startswith("```kotlin"):
+            # Remove the ```kotlin from the beginning
+            code = code[len("```kotlin"):].lstrip()
+        elif code.startswith("```"):
+            # Remove the ``` from the beginning
+            code = code[len("```"):].lstrip()
+            # If the first line is just a language identifier (kotlin, java, etc.), remove it
+            lines = code.split('\n', 1)
+            if len(lines) > 1 and lines[0].strip().lower() in ["kotlin", "java", "python", "typescript", "javascript"]:
+                code = lines[1]
+
+        # Remove the ``` from the end if present
+        if code.endswith("```"):
+            code = code[:code.rfind("```")].rstrip()
+
+        # Also check for any nested code blocks and remove them
+        while "```" in code:
+            start_idx = code.find("```")
+            end_idx = code.find("```", start_idx + 3)
+            if end_idx == -1:
+                break
+            # Remove the entire code block including the markers
+            code = code[:start_idx] + code[end_idx + 3:]
+
+        return code
+
     def _get_test_file_path(self, file_path: str) -> str:
         """
         Gets the path of the test file for a given source file.
@@ -331,8 +371,11 @@ class GenerateTestsForCommitUseCase:
                 'skip_dependency_search': skip_dependencies
             })
 
-            # 7. Write the test file
-            self.file_system.write_file(str(output_path), test_code)
+            # 7. Clean the test code to remove any markdown code block markers
+            cleaned_test_code = self._clean_code_block_markers(test_code)
+
+            # 8. Write the test file
+            self.file_system.write_file(str(output_path), cleaned_test_code)
 
             # 8. Return the result
             return {

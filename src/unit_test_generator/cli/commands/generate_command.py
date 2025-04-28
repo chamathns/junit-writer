@@ -123,7 +123,7 @@ def handle_generate(args: argparse.Namespace, config: Dict[str, Any]):
             # Execute the commit-based use case
             logger.info(f"Executing generate tests for commit: {target_norm}")
             result = generate_tests_for_commit_use_case.execute(
-                commit_hash=target_norm,
+                commit_hash_or_file_path=target_norm,
                 file_extensions=file_extensions,
                 parallel=args.parallel,
                 max_workers=args.max_workers

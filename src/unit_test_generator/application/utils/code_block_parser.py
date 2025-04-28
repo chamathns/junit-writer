@@ -10,11 +10,11 @@ logger = logging.getLogger(__name__)
 def parse_llm_code_block(response_text: str, language: str = "kotlin") -> Optional[str]:
     """
     Extracts code from a markdown code block.
-    
+
     Args:
         response_text: The LLM response text
         language: The programming language
-        
+
     Returns:
         The extracted code, or None if no code block is found
     """
@@ -54,6 +54,33 @@ def parse_llm_code_block(response_text: str, language: str = "kotlin") -> Option
             # Basic validation of the extracted code
             if code:
                 logger.debug(f"Successfully extracted code block of {len(code)} characters")
+
+                # Check for nested code blocks within the extracted code
+                # This handles cases where the LLM includes markdown code blocks in the generated code
+                nested_code_blocks = []
+                nested_start_index = 0
+                while True:
+                    nested_start = code.find("```", nested_start_index)
+                    if nested_start == -1:
+                        break
+
+                    nested_end = code.find("```", nested_start + 3)
+                    if nested_end == -1:
+                        break
+
+                    # Extract the nested code block (without the backticks)
+                    nested_block = code[nested_start:nested_end + 3]
+                    nested_code_blocks.append(nested_block)
+                    nested_start_index = nested_end + 3
+
+                # Remove all nested code blocks
+                for nested_block in nested_code_blocks:
+                    code = code.replace(nested_block, "")
+
+                # If we found and removed nested code blocks, log it
+                if nested_code_blocks:
+                    logger.info(f"Removed {len(nested_code_blocks)} nested code blocks from the generated code")
+
                 return code
             else:
                 logger.warning("LLM response contained an empty code block")
@@ -74,6 +101,14 @@ def parse_llm_code_block(response_text: str, language: str = "kotlin") -> Option
         if ("package " in response_text or "import " in response_text) and \
            ("class " in response_text or "fun " in response_text):
             logger.warning("No code block found, but response appears to be Kotlin code. Using entire response.")
+
+            # Check for and remove any markdown code blocks in the raw response
+            if "```" in response_text:
+                logger.warning("Found code block markers in raw response, removing them")
+                # Simple approach: remove all occurrences of ```
+                cleaned_response = response_text.replace("```kotlin", "").replace("```", "")
+                return cleaned_response.strip()
+
             return response_text
 
     logger.warning("Could not find valid code block in LLM response")
