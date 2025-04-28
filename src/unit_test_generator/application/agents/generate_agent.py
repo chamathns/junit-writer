@@ -141,13 +141,13 @@ class GenerateAgent(Agent):
         logger.info(f"Using observations from state: {observations.keys() if observations else 'None'}")
 
         context = {
-            "source_file": observations.get("file_path"),
-            "source_code": observations.get("file_content"),
+            "target_file_path": observations.get("file_path"),
+            "target_file_content": observations.get("file_content"),
             "language": state.data.get("language", "Kotlin"),
             "framework": state.data.get("framework", "JUnit5 with MockK"),
             "update_mode": observations.get("update_mode", False),
             "existing_test_content": observations.get("existing_test_content"),
-            "rag_examples": observations.get("rag_results", []) if use_rag else []
+            "similar_files_with_tests": observations.get("rag_results", []) if use_rag else []
         }
 
         logger.info(f"Built context for LLM: {context.keys()}")
@@ -203,8 +203,8 @@ class GenerateAgent(Agent):
                         logger.info(f"Generating tests using LLM with strategy: {strategy}")
                         logger.info(f"Context keys: {context.keys()}")
 
-                        # Check if we're in update mode and have existing test content
-                        if context.get("update_mode") and context.get("existing_test_content"):
+                        # Always generate new tests, even in update mode
+                        if False:  # Disabled the shortcut to use existing content
                             logger.info("Using existing test content for update mode")
                             # In update mode, we can just use the existing test content
                             generated_code_raw = context.get("existing_test_content")

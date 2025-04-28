@@ -103,7 +103,7 @@ generation:
 
 # --- Error Parsing Settings ---
 error_parsing:
-  adapter: "hybrid" # Options: "hybrid", "enhanced_llm", "regex", "llm", "junit_gradle"
+  adapter: "hybrid" # Options: "hybrid", "enhanced_llm", "regex" (deprecated: "llm", "junit_gradle")
 
 # --- Build System Settings ---
 build_system:
@@ -133,6 +133,20 @@ commit_mode:
   use_diff_focused_approach: true  # Use the diff-focused approach for test generation/updating
   skip_similar_test_search: true   # Skip similar test search when no new imports are added
   skip_dependency_search: true     # Skip dependent files search when no new imports are added
+
+# --- Agent Configuration ---
+agents:
+  enabled: true
+  coordinator:
+    max_goal_attempts: 3
+
+  # Individual agent configuration
+  generate:
+    model: "gemini-2.0-flash"
+    max_iterations: 5
+    success_criteria:
+      - "compiles_successfully"
+      - "covers_public_methods"
 
 # --- Self-Healing Settings ---
 self_healing:
