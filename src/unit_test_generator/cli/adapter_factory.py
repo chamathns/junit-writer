@@ -9,8 +9,6 @@ from unit_test_generator.infrastructure.adapters.llm.google_gemini_adapter impor
 from unit_test_generator.infrastructure.adapters.llm.mock_llm_adapter import MockLLMAdapter
 from unit_test_generator.infrastructure.adapters.parsing.simulated_parser_adapter import SimulatedParserAdapter
 from unit_test_generator.infrastructure.adapters.build_system.gradle_adapter import GradleAdapter
-from unit_test_generator.infrastructure.adapters.error_parsing.llm_error_parser_adapter import LLMErrorParserAdapter
-from unit_test_generator.infrastructure.adapters.error_parsing.junit_gradle_parser_adapter import JUnitGradleErrorParserAdapter
 from unit_test_generator.infrastructure.adapters.error_parsing.enhanced_llm_error_parser import EnhancedLLMErrorParserAdapter
 from unit_test_generator.infrastructure.adapters.error_parsing.regex_error_parser_adapter import RegexErrorParserAdapter
 from unit_test_generator.infrastructure.adapters.error_parsing.hybrid_error_parser_adapter import HybridErrorParserAdapter
@@ -185,12 +183,10 @@ def create_error_parser(config: Dict[str, Any], llm_service: LLMServicePort) -> 
     elif parser_type == 'regex':
         # Regex-based parser optimized for Kotlin/JUnit5/MockK errors
         return RegexErrorParserAdapter(config=config)
-    elif parser_type == 'llm':
-        # Original LLM parser
-        return LLMErrorParserAdapter(llm_service=llm_service, config=config)
-    elif parser_type == 'junit_gradle':
-        logger.warning("Using basic JUnit/Gradle Error Parser. May be inaccurate.")
-        return JUnitGradleErrorParserAdapter()
+    elif parser_type in ['llm', 'junit_gradle']:
+        # For backward compatibility, map deprecated parsers to recommended alternatives
+        logger.warning(f"Parser type '{parser_type}' is deprecated. Using 'hybrid' parser instead.")
+        return HybridErrorParserAdapter(llm_service=llm_service, config=config)
     else:
         raise ValueError(f"Unsupported error parsing adapter type: {parser_type}")
 
