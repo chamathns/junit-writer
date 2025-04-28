@@ -49,6 +49,9 @@ class GradleAdapter(BuildSystemPort):
         # Test roots from indexing config
         self.test_roots = config.get('indexing', {}).get('test_roots', ['src/test/kotlin'])
 
+        # Store reference to terminal manager for direct access
+        self.terminal_manager = terminal_manager
+
         # Cache for verified commands
         self._verified_command = None
 

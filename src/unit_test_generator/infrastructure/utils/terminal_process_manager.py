@@ -264,6 +264,50 @@ class TerminalProcessManager:
             logger.error(f"Error reading output file: {e}")
             return f"Error reading output: {e}"
 
+    def wait_for_process_completion(self, terminal_id: int, timeout: int = 300, check_interval: int = 2) -> Tuple[bool, str]:
+        """
+        Wait for a terminal process to complete with a timeout.
+
+        Args:
+            terminal_id: The terminal ID
+            timeout: Maximum time to wait in seconds
+            check_interval: Time between checks in seconds
+
+        Returns:
+            A tuple of (completed, output) where completed is True if the process completed
+            within the timeout, and output is the terminal output
+        """
+        process = self.get_process(terminal_id)
+        if not process:
+            logger.warning(f"Process with terminal ID {terminal_id} not found")
+            return False, ""
+
+        logger.info(f"Waiting for process with terminal ID {terminal_id} to complete (timeout: {timeout}s)")
+
+        start_time = time.time()
+        elapsed_time = 0
+
+        while elapsed_time < timeout:
+            # Check if the process is still running
+            if not process.is_running:
+                logger.info(f"Process with terminal ID {terminal_id} completed after {elapsed_time:.2f}s")
+                # Get the output
+                output = self.get_output(terminal_id)
+                return True, output
+
+            # Check if the output contains completion indicators
+            output = self.get_output(terminal_id)
+            if "BUILD SUCCESSFUL" in output or "BUILD FAILED" in output:
+                logger.info(f"Build completion detected for terminal ID {terminal_id} after {elapsed_time:.2f}s")
+                return True, output
+
+            # Wait before checking again
+            time.sleep(check_interval)
+            elapsed_time = time.time() - start_time
+
+        logger.warning(f"Timeout waiting for process with terminal ID {terminal_id} to complete after {timeout}s")
+        return False, self.get_output(terminal_id)
+
     def kill_process(self, terminal_id: int) -> bool:
         """
         Kill a terminal process.

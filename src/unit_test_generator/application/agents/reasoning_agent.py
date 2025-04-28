@@ -42,19 +42,19 @@ class ReasoningAgent(BaseAgent):
             Dictionary of observations
         """
         logger.info("Reasoning agent observing state")
-        
+
         # Get the test file path and code
         test_file_path = state.data.get("test_file_path")
         test_code = state.data.get("test_code")
-        
+
         # Get the target file path and content
         target_file_abs_path = state.data.get("target_file_abs_path")
         target_file_content = state.data.get("target_file_content")
-        
+
         # Check if we have a terminal ID (for getting output)
         terminal_id = state.data.get("terminal_id")
         terminal_output = ""
-        
+
         # If we have a terminal ID, get the output
         if terminal_id is not None:
             get_terminal_output_tool = self.tools.get("get_terminal_output")
@@ -67,11 +67,11 @@ class ReasoningAgent(BaseAgent):
                     logger.info(f"Got terminal output from terminal {terminal_id}, length: {len(terminal_output)}")
                 except Exception as e:
                     logger.error(f"Error getting terminal output: {e}", exc_info=True)
-        
+
         # Parse errors from terminal output
         errors = []
         raw_error_output = terminal_output
-        
+
         if raw_error_output:
             parse_errors_tool = self.tools.get("parse_errors")
             if parse_errors_tool:
@@ -83,7 +83,7 @@ class ReasoningAgent(BaseAgent):
                     logger.info(f"Parsed {len(errors)} errors from terminal output")
                 except Exception as e:
                     logger.error(f"Error parsing errors: {e}", exc_info=True)
-        
+
         # Return observations
         return {
             "test_file_path": test_file_path,
@@ -110,7 +110,7 @@ class ReasoningAgent(BaseAgent):
             Thoughts about what to do next
         """
         logger.info("Reasoning agent thinking about what to do")
-        
+
         # Check if we can fix the test
         can_fix = observations.get("can_fix", False)
         if not can_fix:
@@ -120,11 +120,11 @@ class ReasoningAgent(BaseAgent):
                 "reason": "Cannot fix the test",
                 "needs_fixing": False
             }
-        
+
         # Get the current reasoning step
         reasoning_step = observations.get("reasoning_step", 0)
         fix_attempts = observations.get("fix_attempts", 0)
-        
+
         # Check if we've reached the maximum number of reasoning steps
         if reasoning_step >= self.max_reasoning_steps:
             logger.info(f"Reached maximum number of reasoning steps ({self.max_reasoning_steps})")
@@ -133,7 +133,7 @@ class ReasoningAgent(BaseAgent):
                 "reason": f"Reached maximum number of reasoning steps ({self.max_reasoning_steps})",
                 "needs_fixing": False
             }
-        
+
         # Check if we've reached the maximum number of fix attempts
         if fix_attempts >= self.max_fix_attempts:
             logger.info(f"Reached maximum number of fix attempts ({self.max_fix_attempts})")
@@ -142,11 +142,11 @@ class ReasoningAgent(BaseAgent):
                 "reason": f"Reached maximum number of fix attempts ({self.max_fix_attempts})",
                 "needs_fixing": False
             }
-        
+
         # Get the errors and raw error output
         errors = observations.get("errors", [])
         raw_error_output = observations.get("raw_error_output", "")
-        
+
         # If we have no errors and no raw error output, we can't fix anything
         if not errors and not raw_error_output:
             logger.info("No errors to fix")
@@ -155,7 +155,7 @@ class ReasoningAgent(BaseAgent):
                 "reason": "No errors to fix",
                 "needs_fixing": False
             }
-        
+
         # Determine the next step based on the current reasoning step
         if reasoning_step == 0:
             # First step: Analyze errors
@@ -214,16 +214,16 @@ class ReasoningAgent(BaseAgent):
             List of actions to take
         """
         logger.info("Reasoning agent deciding actions")
-        
+
         # Check if we need to fix anything
         needs_fixing = thoughts.get("needs_fixing", False)
         if not needs_fixing:
             logger.info("No actions needed")
             return []
-        
+
         # Get the action to take
         action = thoughts.get("action")
-        
+
         if action == "analyze_errors":
             # Use the analyze_errors tool
             analyze_errors_tool = self.tools.get("analyze_errors")
@@ -251,7 +251,7 @@ class ReasoningAgent(BaseAgent):
                         "error_output": thoughts.get("raw_error_output", "")
                     }
                 }]
-        
+
         elif action == "identify_dependencies":
             # Use the identify_dependencies tool
             identify_dependencies_tool = self.tools.get("identify_dependencies")
@@ -276,7 +276,7 @@ class ReasoningAgent(BaseAgent):
                         "error_output": thoughts.get("raw_error_output", "")
                     }
                 }]
-        
+
         elif action == "generate_fix":
             # Use the intelligent_fix tool with enhanced context
             intelligent_fix_tool = self.tools.get("intelligent_fix")
@@ -305,7 +305,7 @@ class ReasoningAgent(BaseAgent):
                         "error_output": thoughts.get("raw_error_output", "")
                     }
                 }]
-        
+
         else:
             logger.warning(f"Unknown action: {action}")
             return []
@@ -322,21 +322,21 @@ class ReasoningAgent(BaseAgent):
             Updated state
         """
         logger.info(f"Reasoning agent executing {len(actions)} actions")
-        
+
         # If there are no actions, return the current state
         if not actions:
             logger.info("No actions to execute")
             return state
-        
+
         # Execute each action and collect results
         results = []
         for action in actions:
             tool_name = action.get("tool")
             args = action.get("args", {})
-            
+
             logger.info(f"Executing tool: {tool_name}")
             tool = self.tools.get(tool_name)
-            
+
             if not tool:
                 logger.error(f"Tool {tool_name} not found")
                 results.append({
@@ -344,11 +344,11 @@ class ReasoningAgent(BaseAgent):
                     "error": f"Tool {tool_name} not found"
                 })
                 continue
-            
+
             try:
                 # Log the tool arguments for debugging
                 logger.info(f"Tool {tool_name} arguments: {args.keys()}")
-                
+
                 result = tool._execute(args)
                 results.append(result)
                 logger.info(f"Tool {tool_name} executed successfully")
@@ -358,44 +358,44 @@ class ReasoningAgent(BaseAgent):
                     "success": False,
                     "error": f"Error executing tool {tool_name}: {str(e)}"
                 })
-        
+
         # Update the state based on the results
         updated_state = state
-        
+
         # Get the current reasoning step and fix attempts
         reasoning_step = state.data.get("reasoning_step", 0)
         fix_attempts = state.data.get("fix_attempts", 0)
-        
+
         # Increment the reasoning step
         reasoning_step += 1
-        
+
         # Process the results based on the action
         for result in results:
             if not result.get("success", False):
                 continue
-            
+
             # If we have an error analysis result, store it
             if "analysis" in result:
                 updated_state = updated_state.update({
                     "error_analysis": result.get("analysis", {})
                 })
-            
+
             # If we have a dependencies result, store it
             if "dependencies" in result:
                 updated_state = updated_state.update({
                     "dependencies": result.get("dependencies", {})
                 })
-            
+
             # If we have a fixed code result, store it and run the test
             if "fixed_code" in result:
                 fixed_code = result.get("fixed_code")
                 test_file_path = state.data.get("test_file_path")
-                
+
                 # Update the state with the fixed code
                 updated_state = updated_state.update({
                     "test_code": fixed_code
                 })
-                
+
                 # Write the fixed code to the test file
                 try:
                     with open(test_file_path, "w") as f:
@@ -403,7 +403,7 @@ class ReasoningAgent(BaseAgent):
                     logger.info(f"Wrote fixed code to {test_file_path}")
                 except Exception as e:
                     logger.error(f"Error writing fixed code to {test_file_path}: {e}", exc_info=True)
-                
+
                 # Run the test in a terminal
                 run_terminal_test_tool = self.tools.get("run_terminal_test")
                 if run_terminal_test_tool:
@@ -412,31 +412,67 @@ class ReasoningAgent(BaseAgent):
                             "test_file_abs_path": test_file_path,
                             "title": f"Test for {Path(test_file_path).name}"
                         })
-                        
+
                         terminal_id = terminal_result.get("terminal_id")
                         output_file = terminal_result.get("output_file")
-                        
+
                         # Update the state with the terminal information
                         updated_state = updated_state.update({
                             "terminal_id": terminal_id,
                             "output_file": output_file,
                             "test_running": True
                         })
-                        
+
+                        # Wait for the build to complete
+                        logger.info(f"Waiting for build to complete in terminal {terminal_id}")
+                        get_terminal_output_tool = self.tools.get("get_terminal_output")
+                        if get_terminal_output_tool:
+                            try:
+                                # Get the terminal manager from the tool
+                                terminal_manager = get_terminal_output_tool.build_system.terminal_manager
+
+                                # Wait for the process to complete with a timeout
+                                completed, output = terminal_manager.wait_for_process_completion(
+                                    terminal_id=terminal_id,
+                                    timeout=120,  # 2 minutes timeout
+                                    check_interval=2  # Check every 2 seconds
+                                )
+
+                                if completed:
+                                    logger.info("Build process completed")
+                                    # Update the state with the build output
+                                    updated_state = updated_state.update({
+                                        "test_running": False,
+                                        "build_completed": True,
+                                        "build_output": output,
+                                        "build_success": "BUILD SUCCESSFUL" in output and "BUILD FAILED" not in output
+                                    })
+                                else:
+                                    logger.warning("Build process timed out")
+                                    # Update the state with the timeout information
+                                    updated_state = updated_state.update({
+                                        "test_running": False,
+                                        "build_completed": False,
+                                        "build_timeout": True,
+                                        "build_output": output
+                                    })
+                            except Exception as e:
+                                logger.error(f"Error waiting for build completion: {e}", exc_info=True)
+
                         # Increment the fix attempts
                         fix_attempts += 1
-                        
+
                         # Reset the reasoning step to 0 to start the process again
                         reasoning_step = 0
                     except Exception as e:
                         logger.error(f"Error running test in terminal: {e}", exc_info=True)
-        
+
         # Update the state with the new reasoning step and fix attempts
         updated_state = updated_state.update({
             "reasoning_step": reasoning_step,
             "fix_attempts": fix_attempts
         })
-        
+
         return updated_state
 
     def _is_success(self, state: AgentState) -> bool:
@@ -452,18 +488,31 @@ class ReasoningAgent(BaseAgent):
         # Check if we've reached the maximum number of reasoning steps or fix attempts
         reasoning_step = state.data.get("reasoning_step", 0)
         fix_attempts = state.data.get("fix_attempts", 0)
-        
+
         if reasoning_step >= self.max_reasoning_steps:
             logger.info(f"Reached maximum number of reasoning steps ({self.max_reasoning_steps})")
             return True
-        
+
         if fix_attempts >= self.max_fix_attempts:
             logger.info(f"Reached maximum number of fix attempts ({self.max_fix_attempts})")
             return True
-        
+
+        # Check if the build has completed
+        build_completed = state.data.get("build_completed", False)
+
+        # If the build has completed, check if it was successful
+        if build_completed:
+            build_success = state.data.get("build_success", False)
+            if build_success:
+                logger.info("Test passed successfully")
+                return True
+            else:
+                logger.info("Build completed but test failed")
+                # Continue with the healing process
+
         # Check if the test is running
         test_running = state.data.get("test_running", False)
-        
+
         # If the test is running, check if it's successful
         if test_running:
             terminal_id = state.data.get("terminal_id")
@@ -471,25 +520,40 @@ class ReasoningAgent(BaseAgent):
                 get_terminal_output_tool = self.tools.get("get_terminal_output")
                 if get_terminal_output_tool:
                     try:
-                        terminal_result = get_terminal_output_tool._execute({
-                            "terminal_id": terminal_id
-                        })
-                        terminal_output = terminal_result.get("output", "")
-                        
-                        # Check if the test passed
-                        if "BUILD SUCCESSFUL" in terminal_output and "BUILD FAILED" not in terminal_output:
-                            logger.info("Test passed successfully")
-                            return True
+                        # Get the terminal manager from the tool
+                        terminal_manager = get_terminal_output_tool.build_system.terminal_manager
+
+                        # Wait for the process to complete with a timeout
+                        completed, output = terminal_manager.wait_for_process_completion(
+                            terminal_id=terminal_id,
+                            timeout=60,  # 1 minute timeout
+                            check_interval=2  # Check every 2 seconds
+                        )
+
+                        if completed:
+                            logger.info("Build process completed during success check")
+                            # Update the state with the build output
+                            state.data["test_running"] = False
+                            state.data["build_completed"] = True
+                            state.data["build_output"] = output
+                            state.data["build_success"] = "BUILD SUCCESSFUL" in output and "BUILD FAILED" not in output
+
+                            # Check if the test passed
+                            if state.data["build_success"]:
+                                logger.info("Test passed successfully")
+                                return True
+                        else:
+                            logger.warning("Build process still running or timed out during success check")
                     except Exception as e:
-                        logger.error(f"Error getting terminal output: {e}", exc_info=True)
-        
+                        logger.error(f"Error checking build completion: {e}", exc_info=True)
+
         # If we're still in the reasoning process, we're not done yet
         if reasoning_step > 0 and reasoning_step < self.max_reasoning_steps:
             return False
-        
+
         # If we've made a fix attempt but haven't reached the maximum, we're not done yet
         if fix_attempts > 0 and fix_attempts < self.max_fix_attempts:
             return False
-        
+
         # Default to not done
         return False
