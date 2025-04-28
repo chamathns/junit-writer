@@ -2,11 +2,9 @@ from dataclasses import dataclass, field
 from typing import Optional, List
 from enum import Enum, auto
 
-
 class ArtifactType(Enum):
     SOURCE = auto()
     TEST = auto()
-
 
 @dataclass
 class CodeArtifact:
@@ -15,30 +13,26 @@ class CodeArtifact:
     absolute_path: str
     module_name: str
     artifact_type: ArtifactType
-    language: Optional[str] = None  # e.g., 'kotlin', 'java', inferred from extension
-    content: Optional[str] = None  # Content might be loaded lazily
-
+    language: Optional[str] = None # e.g., 'kotlin', 'java', inferred from extension
+    content: Optional[str] = None # Content might be loaded lazily
 
 @dataclass
 class SourceCodeArtifact(CodeArtifact):
     """Specialized artifact for source code."""
     artifact_type: ArtifactType = ArtifactType.SOURCE
-    linked_test_paths: List[str] = field(default_factory=list)  # Relative paths of corresponding tests
-
+    linked_test_paths: List[str] = field(default_factory=list) # Relative paths of corresponding tests
 
 @dataclass
 class TestCodeArtifact(CodeArtifact):
     """Specialized artifact for test code."""
     artifact_type: ArtifactType = ArtifactType.TEST
-    linked_source_path: Optional[str] = None  # Relative path of corresponding source
-
+    linked_source_path: Optional[str] = None # Relative path of corresponding source
 
 @dataclass
 class RepositoryStructure:
     """Holds the structured information about the scanned repository."""
     repo_root: str
     modules: dict[str, dict[str, list[CodeArtifact]]] = field(default_factory=dict)
-
     # Example: modules['my_module']['source_files'] = [SourceCodeArtifact(...)]
     #          modules['my_module']['test_files'] = [TestCodeArtifact(...)]
 
