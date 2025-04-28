@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 
-
 class VectorDBPort(ABC):
     """Interface for interacting with a vector database."""
 
@@ -11,8 +10,7 @@ class VectorDBPort(ABC):
         pass
 
     @abstractmethod
-    def find_similar(self, embedding: List[float], n_results: int, filter_metadata: Optional[Dict[str, Any]] = None) -> \
-    List[Dict[str, Any]]:
+    def find_similar(self, embedding: List[float], n_results: int, filter_metadata: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """Finds similar documents based on embedding."""
         pass
 

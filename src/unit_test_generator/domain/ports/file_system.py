@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from typing import List, Optional, Generator
 from pathlib import Path
 
-
 class FileSystemPort(ABC):
     """Interface for interacting with the file system."""
 
@@ -47,4 +46,14 @@ class FileSystemPort(ABC):
     @abstractmethod
     def get_file_stem(self, file_path: str) -> str:
         """Returns the filename without the extension."""
+        pass
+
+    @abstractmethod
+    def list_files(self, directory_path: str) -> List[str]:
+        """Lists all files in a directory."""
+        pass
+
+    @abstractmethod
+    def file_exists(self, file_path: str) -> bool:
+        """Checks if a file exists."""
         pass
