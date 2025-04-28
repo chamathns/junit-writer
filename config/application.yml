@@ -157,7 +157,7 @@ agents:
 
 # --- Self-Healing Settings ---
 self_healing:
-  enabled: true
-  max_attempts: 3
-  max_parallel_agents: 3  # Maximum number of parallel error analysis agents
+  enabled: false
+  max_attempts: 1
+  max_parallel_agents: 1  # Maximum number of parallel error analysis agents
   use_intelligent_fix: true  # Use the new intelligent error analysis system

@@ -4,6 +4,8 @@ from typing import Dict, Any
 import google.generativeai as genai
 from google.api_core import exceptions as google_exceptions
 from pathlib import Path
+import traceback
+from datetime import datetime
 
 from unit_test_generator.domain.ports.llm_service import LLMServicePort
 
@@ -103,11 +105,15 @@ class GoogleGeminiAdapter(LLMServicePort):
         """Builds the detailed prompt for the Gemini model."""
         # Initialize common variables
         target_file_path = context_payload.get("target_file_path")
-        target_file_content = context_payload.get("target_file_content")
+        target_file_content = context_payload.get("target_file_content", "")
         similar_files_info = context_payload.get("similar_files_with_tests", [])
         gen_config = self.config.get('generation', {})
         language = gen_config.get('target_language', 'Kotlin')
         framework = gen_config.get('target_framework', 'JUnit5 with MockK')
+
+        # Initialize token count and max tokens for context size tracking
+        token_count = len(target_file_content) if target_file_content else 0  # Very rough estimate
+        max_tokens = gen_config.get('context_max_tokens', 15000)
 
         # Check the task type
         task = context_payload.get("task", "generate_tests")
@@ -120,6 +126,15 @@ class GoogleGeminiAdapter(LLMServicePort):
             return self._build_dependency_discovery_prompt(context_payload)
         elif task == "diff_focused_test_generation":
             return self._build_diff_focused_prompt(context_payload)
+        elif task == "parse_errors":
+            # Use the prompt provided by the error parser
+            if "prompt" in context_payload:
+                logger.info("Using provided prompt for error parsing task")
+                return context_payload["prompt"]
+            else:
+                logger.warning("No prompt provided for error parsing task. Using fallback prompt.")
+                # Fallback prompt if none provided
+                return self._build_error_parsing_fallback_prompt(context_payload)
         elif "current_test_code" in context_payload and "error_output" in context_payload:
             # --- Build FIX Prompt ---
             prompt = f"You are an expert software engineer debugging unit tests...\n"
@@ -178,8 +193,6 @@ class GoogleGeminiAdapter(LLMServicePort):
         if similar_files_info:
             prompt += "Reference examples from the same codebase (similar source files and their tests):\n\n"
             # Limit context size to avoid exceeding model limits
-            token_count = len(target_file_content) # Very rough estimate
-            max_tokens = gen_config.get('context_max_tokens', 15000)
 
             for i, similar_info in enumerate(similar_files_info):
                 source_path = similar_info['source_file_path']
@@ -199,92 +212,114 @@ class GoogleGeminiAdapter(LLMServicePort):
                 prompt += f"  ```{language.lower()}\n{source_content}\n```\n"
                 prompt += f"  Corresponding Unit Test File (`{test_path}`):\n"
                 prompt += f"  ```{language.lower()}\n{test_content}\n```\n\n"
-        else:
-            prompt += "No similar files with existing tests were found for reference.\n"
-            prompt += f"Please generate tests based solely on the target file's content and general best practices for {language} with {framework}.\n\n"
 
-        # Include Dependency Files
+        # Add dependency files if available
         dependency_files = context_payload.get("dependency_files", [])
         if dependency_files:
-            # Separate DTOs from other dependencies for better organization
-            dto_files = [dep for dep in dependency_files if dep.get('is_dto', False)]
-            other_deps = [dep for dep in dependency_files if not dep.get('is_dto', False)]
+            prompt += "Relevant dependency files from the codebase:\n\n"
+            for i, dep_file in enumerate(dependency_files):
+                dep_path = dep_file.get('file_path')
+                dep_content = dep_file.get('content')
+                dep_relevance = dep_file.get('relevance', 'Unknown')
 
-            # Use target language for code block formatting
-            lang_tag = context_payload.get("language", "kotlin").lower()
+                # Skip if no content
+                if not dep_content:
+                    continue
 
-            # First show DTO and model classes (important for test structure)
-            if dto_files:
-                prompt += "DTO and Model Classes (important for test structure):\n\n"
-                for dep_info in dto_files:
-                    dep_path = dep_info['dependency_path']
-                    dep_content = dep_info['content']
-                    prompt += f"DTO/Model (`{dep_path}`):\n"
-                    prompt += f"```{lang_tag}\n{dep_content}\n```\n\n"
+                # Estimate token increase and check limit
+                added_tokens = len(dep_content)
+                if token_count + added_tokens > max_tokens:
+                    logger.warning(f"Context limit reached. Skipping remaining {len(dependency_files) - i} dependency files.")
+                    break
+                token_count += added_tokens
 
-            # Then show other dependencies
-            if other_deps:
-                prompt += "Other relevant imported classes from the project:\n\n"
-                for dep_info in other_deps:
-                    dep_path = dep_info['dependency_path']
-                    dep_content = dep_info['content']
-                    prompt += f"Dependency (`{dep_path}`):\n"
-                    prompt += f"```{lang_tag}\n{dep_content}\n```\n\n"
+                prompt += f"Dependency {i+1} (`{dep_path}`, relevance: {dep_relevance}):\n"
+                prompt += f"```{language.lower()}\n{dep_content}\n```\n\n"
 
-        prompt += "INSTRUCTIONS:\n"
-        prompt += "------------\n"
-        prompt += (f"1. Write complete, runnable unit tests for the public methods and functionalities in the target file `{target_file_path}`. Do not attempt to write tests for private methods.\n")
-        prompt += f"2. Strictly follow the testing conventions, structure (package, imports, class annotations), and style observed in the reference examples, if provided. Match the import style and library usage (e.g., MockK vs Mockito).\n"
-        prompt += f"3. Use {framework} for assertions, mocking (if necessary), and test structure (e.g., `@Test`, `@BeforeEach`).\n"
-        prompt += "4. Ensure tests cover typical use cases, edge cases (nulls, empty inputs, boundaries), and potential error conditions.\n"
-        prompt += "5. Infer the correct package declaration for the test file based on the target file's path and project conventions.\n"
-        prompt += "6. Include all necessary imports, especially for DTO classes and models.\n"
-        prompt += "7. Pay close attention to mocking dependencies if the target class has collaborators. Use MockK if seen in examples.\n"
-        prompt += "8. Make sure to properly handle DTO classes in your tests - use appropriate constructors or builder patterns if available.\n"
-        prompt += "9. For any DTO or model classes, ensure you create valid test instances with all required fields.\n"
-        prompt += "10. Output *only* the complete test file content within a single markdown code block starting with ```{language.lower()} and ending with ```. Do not include any explanations or introductory text outside the code block.\n\n"
-        prompt += "Generated Test Code:\n"
-        # No need to add ``` here, the model should add it based on instructions
+        # Add custom instructions if provided
+        if "instruction" in context_payload and not update_mode:
+            prompt += f"SPECIFIC INSTRUCTIONS:\n{context_payload['instruction']}\n\n"
+
+        # Add standard instructions if not already added (for generation mode)
+        if not update_mode and not "current_test_code" in context_payload:
+            prompt += "INSTRUCTIONS:\n"
+            prompt += "------------\n"
+            prompt += f"1. Write complete, runnable unit tests for the public methods and functionalities in the target file `{target_file_path}`. Do not attempt to write tests for private methods.\n"
+            prompt += "2. Strictly follow the testing conventions, structure (package, imports, class annotations), and style observed in the reference examples, if provided. Match the import style and library usage (e.g., MockK vs Mockito).\n"
+            prompt += f"3. Use {framework} for assertions, mocking (if necessary), and test structure (e.g., `@Test`, `@BeforeEach`).\n"
+            prompt += "4. Ensure tests cover typical use cases, edge cases (nulls, empty inputs, boundaries), and potential error conditions.\n"
+            prompt += "5. Infer the correct package declaration for the test file based on the target file's path and project conventions.\n"
+            prompt += "6. Include all necessary imports, especially for DTO classes and models.\n"
+            prompt += "7. Pay close attention to mocking dependencies if the target class has collaborators. Use MockK if seen in examples.\n"
+            prompt += "8. Make sure to properly handle DTO classes in your tests - use appropriate constructors or builder patterns if available.\n"
+            prompt += "9. For any DTO or model classes, ensure you create valid test instances with all required fields.\n"
+            prompt += f"10. Output *only* the complete test file content within a single markdown code block starting with ```{language.lower()} and ending with ```. Do not include any explanations or introductory text outside the code block.\n\n"
+            prompt += "Generated Test Code:\n"
+            # No need to add ``` here, the model should add it based on instructions
 
         return prompt
 
-    def _build_diff_focused_prompt(self, context_payload: Dict[str, Any]) -> str:
-        """Builds a prompt for diff-focused test generation."""
-        # Get the prompt template from the context payload
-        prompt_template = context_payload.get("prompt_template", "")
+    def _build_error_parsing_fallback_prompt(self, context_payload: Dict[str, Any]) -> str:
+        """Builds a fallback prompt for error parsing when none is provided."""
+        language = context_payload.get("language", self.config.get('generation', {}).get('target_language', 'Kotlin'))
+        build_tool = context_payload.get("build_tool", "Gradle")
+        test_framework = context_payload.get("framework", self.config.get('generation', {}).get('target_framework', 'JUnit5'))
+        raw_output = context_payload.get("raw_output", "")
 
-        # If no template is provided, use a default template
-        if not prompt_template:
-            if context_payload.get("update_mode", False):
-                from unit_test_generator.application.prompts.diff_focused_test_prompt import get_diff_focused_test_update_prompt
-                prompt_template = get_diff_focused_test_update_prompt()
-            else:
-                from unit_test_generator.application.prompts.diff_focused_test_prompt import get_diff_focused_test_generation_prompt
-                prompt_template = get_diff_focused_test_generation_prompt()
+        # Limit raw output size to avoid excessive prompt length
+        max_output_chars = 15000
+        if len(raw_output) > max_output_chars:
+            logger.warning(f"Raw build output exceeds {max_output_chars} chars. Truncating for LLM parser.")
+            # Truncate smartly - keep beginning and end, and look for error sections in the middle
+            beginning = raw_output[:max_output_chars // 3]
+            end = raw_output[-max_output_chars // 3:]
+            middle_size = max_output_chars - len(beginning) - len(end)
 
-        # Check if we should skip similar test search and dependency search
-        skip_similar_test_search = context_payload.get("skip_similar_test_search", False)
-        skip_dependency_search = context_payload.get("skip_dependency_search", False)
+            # Try to find error sections in the middle
+            middle_candidates = ["error:", "Error:", "ERROR:", "FAILURE:", "BUILD FAILED"]
+            middle = ""
+            for candidate in middle_candidates:
+                if candidate in raw_output:
+                    # Find the position of the error
+                    pos = raw_output.find(candidate)
+                    # Extract a section around the error
+                    start = max(0, pos - middle_size // 2)
+                    end_pos = min(len(raw_output), pos + middle_size // 2)
+                    middle = raw_output[start:end_pos]
+                    break
 
-        # Add optimization instructions if needed
-        optimization_instructions = ""
-        if skip_similar_test_search or skip_dependency_search:
-            optimization_instructions += "\nOPTIMIZATION INSTRUCTIONS:\n"
-            if skip_similar_test_search:
-                optimization_instructions += "- Skip similar test search as no new imports were added.\n"
-            if skip_dependency_search:
-                optimization_instructions += "- Skip dependency search as no new imports were added.\n"
+            # If no error sections found, just take the middle
+            if not middle:
+                middle_start = len(beginning)
+                middle_end = len(raw_output) - len(end)
+                middle_center = (middle_start + middle_end) // 2
+                middle = raw_output[middle_center - middle_size // 2:middle_center + middle_size // 2]
 
-        # Format the prompt template with the context payload
-        prompt = prompt_template.format(
-            target_file_content=context_payload.get("target_file_content", ""),
-            diff_content=context_payload.get("diff_content", ""),
-            added_code_blocks=context_payload.get("added_code_blocks", "No added code blocks."),
-            modified_code_blocks=context_payload.get("modified_code_blocks", "No modified code blocks."),
-            new_imports=context_payload.get("new_imports", "No new imports."),
-            existing_test_code=context_payload.get("existing_test_code", ""),
-            optimization_instructions=optimization_instructions
-        )
+            raw_output_snippet = f"{beginning}\n...\n{middle}\n...\n{end}"
+        else:
+            raw_output_snippet = raw_output
+
+        prompt = f"""You are an expert build log analyzer for {language} projects using {build_tool} and {test_framework}.
+Your task is to meticulously analyze the provided build/test output and extract structured information about any errors found (compilation errors, test failures, runtime exceptions during tests, or general build failures).
+
+Input Build/Test Output:
+------------------------
+{raw_output_snippet}
+------------------------
+
+For each error found, extract the following information:
+1. file_path: The path to the file where the error occurred (if available)
+2. line_number: The line number where the error occurred (if available)
+3. message: The error message
+4. error_type: The type of error (e.g., 'Compilation', 'TestFailure', 'Runtime', 'BuildFailure')
+5. error_category: A more specific categorization of the error (e.g., 'UnresolvedReference', 'TypeMismatch', 'AssertionFailure')
+6. involved_symbols: A list of symbols (classes, methods, variables) involved in the error
+7. suggested_fix_approach: A brief suggestion on how to fix the error
+
+IMPORTANT: Your response MUST be a valid JSON array, not Kotlin code or any other format. For example: [{{"file_path": "path/to/file.kt", "line_number": 42, "message": "Error message", "error_type": "Compilation", "error_category": "UnresolvedReference", "involved_symbols": ["com.example.Class"], "suggested_fix_approach": "Add missing import for com.example.Class"}}]
+
+JSON Output:
+"""
 
         return prompt
 
@@ -312,48 +347,85 @@ class GoogleGeminiAdapter(LLMServicePort):
             prompt += "\n"
 
         prompt += "INSTRUCTIONS:\n"
-        prompt += "1. Analyze the source code and identify all dependencies that would be needed for testing.\n"
+        prompt += "------------\n"
+        prompt += "1. Analyze the source file and identify all dependencies that would be needed to write comprehensive unit tests.\n"
         prompt += "2. Focus on identifying:\n"
-        prompt += "   - DTO classes and models used in the code (especially in method parameters and return types)\n"
-        prompt += "   - Service classes that might need to be mocked\n"
-        prompt += "   - Repository classes that need to be mocked\n"
+        prompt += "   - Classes/interfaces that are extended or implemented\n"
+        prompt += "   - External services or components that are used\n"
+        prompt += "   - DTOs, models, or other data structures used in method signatures\n"
         prompt += "   - Utility classes that might be needed\n"
-        prompt += "   - Any other dependencies critical for testing\n"
-        prompt += "3. For Kotlin specifically, pay attention to:\n"
-        prompt += "   - Classes used in constructor parameters\n"
-        prompt += "   - Classes used with dependency injection (e.g., @Autowired, @Inject)\n"
-        prompt += "   - Extension functions that might be used\n"
-        prompt += "   - Companion object references\n"
-        prompt += "4. For each dependency, assign an importance score (0.0-1.0) where 1.0 is most important.\n"
-        prompt += "5. Return your analysis in the following format:\n\n"
-        prompt += "DEPENDENCIES:\n"
+        prompt += "3. For each dependency, provide:\n"
+        prompt += "   - The fully qualified name (with package)\n"
+        prompt += "   - A relevance score from 0.0 to 1.0 (where 1.0 is highest relevance)\n"
+        prompt += "   - A brief explanation of why this dependency is needed for testing\n\n"
+        prompt += "OUTPUT FORMAT:\n"
+        prompt += "-------------\n"
+        prompt += "Return a JSON array of dependency objects with the following structure:\n"
+        prompt += "[\n"
+        prompt += "  {\n"
+        prompt += "    \"name\": \"fully.qualified.ClassName\",\n"
+        prompt += "    \"relevance\": 0.9,\n"
+        prompt += "    \"reason\": \"Used as a parameter in method X\"\n"
+        prompt += "  },\n"
+        prompt += "  ...\n"
+        prompt += "]\n\n"
 
-        # Add examples based on the actual imports to guide the model
-        if imports:
-            # Find a few imports that look like they might be from the same codebase
-            repo_imports = [imp for imp in imports if not (imp.startswith("java.") or imp.startswith("kotlin.") or imp.startswith("org.springframework."))]
-            if repo_imports:
-                for i, imp in enumerate(repo_imports[:3]):
-                    if ".dto." in imp.lower() or imp.endswith("DTO"):
-                        prompt += f"{imp}: 1.0 (Critical DTO class used in the code)\n"
-                    elif ".repository." in imp.lower() or imp.endswith("Repository"):
-                        prompt += f"{imp}: 0.9 (Repository that needs to be mocked)\n"
-                    elif ".service." in imp.lower() or imp.endswith("Service"):
-                        prompt += f"{imp}: 0.9 (Service that needs to be mocked)\n"
-                    else:
-                        prompt += f"{imp}: 0.8 (Used in the code)\n"
+        # Add examples if available
+        if "example_dependencies" in context_payload:
+            prompt += "EXAMPLES:\n"
+            prompt += "--------\n"
+            for dep in context_payload["example_dependencies"]:
+                prompt += f"{dep['name']}: {dep['relevance']} ({dep['reason']})\n"
+            prompt += "\n"
+        else:
+            # Generic examples
+            prompt += "EXAMPLES:\n"
+            prompt += "--------\n"
+            if language.lower() == "kotlin":
+                # Kotlin-specific examples
+                prompt += "org.example.service.UserService: 1.0 (Primary dependency, needs to be mocked in tests)\n"
+                prompt += "org.example.model.UserDTO: 0.9 (Used in method parameters and return values)\n"
+                prompt += "org.example.util.DateFormatter: 0.7 (Used for formatting dates in the class)\n"
+                prompt += "org.example.config.AppConfig: 0.5 (Might be needed for configuration values)\n"
             else:
                 # Generic examples
                 prompt += "com.example.SomeDTO: 1.0 (Critical for testing, used in method parameters)\n"
                 prompt += "com.example.SomeService: 0.9 (Needs to be mocked in tests)\n"
-        else:
-            # Generic examples
-            prompt += "com.example.SomeDTO: 1.0 (Critical for testing, used in method parameters)\n"
-            prompt += "com.example.SomeService: 0.9 (Needs to be mocked in tests)\n"
-
         prompt += "...and so on\n\n"
         prompt += "Make sure to include the FULL package path for each dependency.\n"
         prompt += "Focus on dependencies from the same codebase, especially from the same package.\n"
+
+        return prompt
+
+    def _build_diff_focused_prompt(self, context_payload: Dict[str, Any]) -> str:
+        """Builds a prompt for diff-focused test generation."""
+        # Get the prompt template from the context payload
+        prompt_template = context_payload.get("prompt_template", "")
+
+        # If no template is provided, use a default template
+        if not prompt_template:
+            if context_payload.get("update_mode", False):
+                from unit_test_generator.application.prompts.diff_focused_test_prompt import get_diff_focused_test_update_prompt
+                prompt_template = get_diff_focused_test_update_prompt()
+            else:
+                from unit_test_generator.application.prompts.diff_focused_test_prompt import get_diff_focused_test_generation_prompt
+                prompt_template = get_diff_focused_test_generation_prompt()
+
+        # Add optimization instructions if needed
+        optimization_instructions = ""
+        if self.config.get('generation', {}).get('optimize_for_readability', False):
+            optimization_instructions = "\n11. Optimize the tests for readability and maintainability. Use clear variable names and add comments where necessary."
+
+        # Format the prompt template with the context payload
+        prompt = prompt_template.format(
+            target_file_content=context_payload.get("target_file_content", ""),
+            diff_content=context_payload.get("diff_content", ""),
+            added_code_blocks=context_payload.get("added_code_blocks", "No added code blocks."),
+            modified_code_blocks=context_payload.get("modified_code_blocks", "No modified code blocks."),
+            new_imports=context_payload.get("new_imports", "No new imports."),
+            existing_test_code=context_payload.get("existing_test_code", ""),
+            optimization_instructions=optimization_instructions
+        )
 
         return prompt
 
@@ -382,54 +454,51 @@ class GoogleGeminiAdapter(LLMServicePort):
              parts = response_text.split("```", 2)
              if len(parts) > 1:
                  code_block = parts[1]
-                 # Remove optional language tag from the first line
-                 if '\n' in code_block:
-                     first_line, rest = code_block.split('\n', 1)
-                     if first_line.strip().isalpha() and first_line.strip().islower():
-                         logger.debug(f"Removed language tag '{first_line.strip()}' from generic block")
-                         return rest.strip()
+                 # Check if the first line might be a language tag
+                 lines = code_block.split("\n", 1)
+                 if len(lines) > 1 and lines[0].strip() in ["kotlin", "java", "python", "typescript", "javascript"]:
+                     return lines[1].strip()
                  return code_block.strip()
 
-        logger.warning("Could not find expected markdown code block. Returning raw response.")
-        return response_text # Assume plain code if no block found
+        # No code block found, return as is (might be JSON or other format)
+        logger.debug("No code block found in response. Returning raw text.")
+        return response_text
 
     def _log_context_files(self, context_payload: Dict[str, Any]) -> None:
-        """Logs information about files being added to the context."""
+        """Logs information about files included in the context."""
         # Log target file
-        target_file_path = context_payload.get("target_file_path")
-        if target_file_path:
-            logger.info(f"Adding target file to context: {target_file_path}")
+        target_file = context_payload.get("target_file_path")
+        if target_file:
+            logger.info(f"Target file: {target_file}")
 
         # Log similar files
         similar_files = context_payload.get("similar_files_with_tests", [])
         if similar_files:
-            logger.info(f"Adding {len(similar_files)} similar files to context:")
-            for i, similar_info in enumerate(similar_files):
-                source_path = similar_info.get('source_file_path', 'unknown')
-                test_path = similar_info.get('test_file_path', 'unknown')
-                logger.info(f"  Similar file {i+1}: {source_path} with test {test_path}")
+            logger.info(f"Including {len(similar_files)} similar files in context")
+            for i, file_info in enumerate(similar_files):
+                logger.debug(f"Similar file {i+1}: {file_info.get('source_file_path')} with test {file_info.get('test_file_path')}")
 
         # Log dependency files
         dependency_files = context_payload.get("dependency_files", [])
         if dependency_files:
-            logger.info(f"Adding {len(dependency_files)} dependency files to context:")
-            for i, dep_info in enumerate(dependency_files):
-                dep_path = dep_info.get('dependency_path', 'unknown')
-                logger.info(f"  Dependency file {i+1}: {dep_path}")
+            logger.info(f"Including {len(dependency_files)} dependency files in context")
+            for i, file_info in enumerate(dependency_files):
+                logger.debug(f"Dependency {i+1}: {file_info.get('file_path')} (relevance: {file_info.get('relevance', 'Unknown')})")
 
-    def _save_prompt_to_file(self, prompt: str, task_type: str):
+    def _save_prompt_to_file(self, prompt: str, task_type: str) -> None:
         """Saves the prompt to a file for debugging and analysis."""
         try:
+            # Import required modules
             import os
             import traceback
             from datetime import datetime
-            from pathlib import Path
 
-            # Get the repository root directory from config
-            repo_root = self.config.get('repository', {}).get('root_path', '')
+            # Try to get the repository root
+            repo_root = self.config.get('repository', {}).get('root_path')
             if not repo_root:
-                logger.warning("Repository root path not found in config, using current directory")
+                # Try to infer from current working directory
                 repo_root = os.getcwd()
+                logger.debug(f"Repository root not specified in config, using current directory: {repo_root}")
 
             # Create absolute paths
             prompts_dir = os.path.join(repo_root, "var", "prompts")
@@ -450,23 +519,16 @@ class GoogleGeminiAdapter(LLMServicePort):
                 logger.info(f"Saved prompt to file: {filename}")
             except Exception as file_error:
                 logger.error(f"Error writing to {filename}: {file_error}\n{traceback.format_exc()}")
-
-            # Also save to temp_llm_query.txt for easy access
-            try:
+                # Try writing to temp file as fallback
                 with open(temp_file, "w", encoding="utf-8") as f:
                     f.write(prompt)
                 logger.info(f"Saved prompt to temp file: {temp_file}")
-            except Exception as temp_error:
-                logger.error(f"Error writing to temp file: {temp_error}\n{traceback.format_exc()}")
 
         except Exception as e:
-            logger.error(f"Failed to save prompt to file: {e}\n{traceback.format_exc()}")
+            logger.error(f"Failed to save prompt to file: {e}")
 
             # Last resort: try to save to /tmp
             try:
-                import os
-                from datetime import datetime
-
                 # Try to save to /tmp directory which should be writable
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 tmp_filename = f"/tmp/{task_type}_{timestamp}.txt"
