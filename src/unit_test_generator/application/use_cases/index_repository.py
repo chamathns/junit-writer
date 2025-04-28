@@ -252,10 +252,27 @@ class IndexRepositoryUseCase:
         if self.fs_adapter:
             try:
                 self.fs_adapter.write_json(self.index_file_path, index_data)
+                logger.info(f"Successfully saved index file to {self.index_file_path} using FileSystemAdapter")
             except Exception as e:
                  logger.error(f"Failed to write index JSON file {self.index_file_path}: {e}")
+                 # Try fallback method
+                 self._save_index_file_fallback(index_data)
         else:
-            logger.error("Cannot save index file: FileSystemAdapter with JSON support not available.")
+            logger.warning("FileSystemAdapter with JSON support not available. Using fallback method.")
+            self._save_index_file_fallback(index_data)
+
+    def _save_index_file_fallback(self, index_data: Dict):
+        """Fallback method to save index file when FileSystemAdapter is not available."""
+        try:
+            import json
+            # Convert to JSON string with proper formatting
+            json_content = json.dumps(index_data, indent=2, default=str)
+            # Use the standard write_file method
+            self.fs.write_file(self.index_file_path, json_content)
+            logger.info(f"Successfully saved index file to {self.index_file_path} using fallback method")
+        except Exception as e:
+            logger.error(f"Failed to save index file using fallback method: {e}")
+            return
 
 
     def _populate_rag_database(self, repo_structure: RepositoryStructure):
