@@ -109,17 +109,6 @@ The agent mode uses Google's Agent Development Kit (ADK) to implement a multi-ag
 
 In this workflow, multiple specialized agents work together to analyze the code, generate tests, run them, and fix any issues. The ADK provides the framework for agent communication and coordination.
 
-## Design Patterns
-
-JUnit Writer uses several design patterns:
-
-- **Factory Pattern**: For creating adapters and services
-- **Strategy Pattern**: For selecting different modes of operation
-- **Adapter Pattern**: For interfacing with external systems
-- **Facade Pattern**: For providing a simplified interface to complex subsystems
-- **Command Pattern**: For encapsulating commands as objects
-- **Observer Pattern**: For event handling and progress reporting
-
 ## Extensibility
 
 The clean architecture and use of interfaces make JUnit Writer highly extensible:
