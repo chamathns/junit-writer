@@ -20,7 +20,7 @@ ui:
 repository:
   # Path to the root of the repository to be scanned.
   # Can be overridden by CLI argument.
-  root_path: "/Users/chamath/demo/repositories/abc-service" # Example path, adjust as needed
+  root_path: "/Users/chamath.nayan/UseMultiplier/repositories/payroll/compensation-service" # Example path, adjust as needed
 
 indexing:
   source_roots: [ "src/main/kotlin" ]
@@ -87,7 +87,7 @@ vector_db:
 generation:
   # LLM Provider configuration
   llm_provider: "google_gemini" # Options: "google_gemini", "mock" # Add openai, anthropic later
-  model_name: "gemini-2.0-flash"
+  model_name: "gemini-2.5-pro-preview-03-25"
   # API Key: Set the GOOGLE_API_KEY environment variable
   # Or uncomment and set here (less secure):
   api_key: "{GOOGLE_API_KEY}"
@@ -100,8 +100,8 @@ generation:
 
   # RAG Context settings for generation
   context_similarity_threshold: 0.75 # Minimum similarity score for RAG examples (0.0 to 1.0)
-  context_max_rag_examples: 5      # Max RAG examples to include
-  context_max_dependency_files: 20  # Max dependency files to include
+  context_max_rag_examples: 15      # Max RAG examples to include
+  context_max_dependency_files: 30  # Max dependency files to include
   context_max_tokens: 100000        # Target token limit for the entire context payload
 
   # Intelligent context building
