@@ -20,7 +20,7 @@ ui:
 repository:
   # Path to the root of the repository to be scanned.
   # Can be overridden by CLI argument.
-  root_path: "/Users/chamath.nayan/UseMultiplier/repositories/payroll/compensation-service" # Example path, adjust as needed
+  root_path: "/Users/chamath/demo/repositories/abc-service" # Example path, adjust as needed
 
 indexing:
   source_roots: [ "src/main/kotlin" ]
